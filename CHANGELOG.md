@@ -1,5 +1,11 @@
 # @stripe/stripe-cli-plugin-bootstrap
 
+## 0.4.1
+
+### Patch Changes
+
+- [`ed45699`](https://github.com/stripe/stripe-cli-ts-plugin-bootstrap/commit/ed4569928295bb2b8d9e38c0437181b083454836) Thanks [@jar-stripe](https://github.com/jar-stripe)! - Remove internal URLs, add LICENSE/CODE_OF_CONDUCT/CONTRIBUTING, and remove internal-only documentation files for open-source readiness.
+
 ## 0.4.0
 
 ### Minor Changes
