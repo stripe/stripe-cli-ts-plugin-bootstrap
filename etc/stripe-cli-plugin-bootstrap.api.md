@@ -22,6 +22,14 @@ export function addTypedService<U extends UntypedServiceImplementation>(
 ): void
 
 // @public
+export interface APIKeyAuth {
+  // (undocumented)
+  apiKey: string
+  // (undocumented)
+  type: 'api-key'
+}
+
+// @public
 export function buildArgsArray(
   cmd: ExtractedCommand,
   args: Record<string, unknown>,
@@ -87,6 +95,12 @@ export interface CoreCLIHelper {
 }
 
 // @public
+export interface CredentialResolver {
+  // (undocumented)
+  resolve(livemode: boolean): Promise<StripeAuth>
+}
+
+// @public
 export const DeviceNameName = 'device_name'
 
 // @public
@@ -94,6 +108,9 @@ export const Devmode: boolean
 
 // @public
 export const DisplayNameName = 'display_name'
+
+// @public
+export function ensureConfigInitialized(): Config
 
 // @public
 export function extractCommands(
@@ -238,6 +255,9 @@ export const IsTermsAcceptanceValidName = 'is_terms_acceptance_valid'
 export function isTTY(): boolean
 
 // @public
+export function isUATAuth(auth: { type: string }): auth is UATAuth
+
+// @public
 export class Keychain {
   constructor(helper: CoreCLIHelper)
   delete(key: string): Promise<boolean>
@@ -251,6 +271,9 @@ export interface KeychainItem {
   key: string
   value: string
 }
+
+// @public
+export const LiveContextName = 'live_context'
 
 // @public
 export const LiveModeAPIKeyName = 'live_mode_api_key'
@@ -303,9 +326,19 @@ export class Profile {
   getConfigFieldValue(fieldName: string): string
   getDeviceName(): string
   getDisplayName(): string
+  getLiveContext(): string | null
+  getTestWorkspaceID(): string | null
+  getUAT(): Promise<string | null>
   // (undocumented)
   profileName: string
   retrieveLivemodeValue(key: string): Promise<string>
+}
+
+// @public
+export class ProfileCredentialResolver implements CredentialResolver {
+  constructor(profile: Profile)
+  // (undocumented)
+  resolve(livemode: boolean): Promise<StripeAuth>
 }
 
 // @public
@@ -346,10 +379,111 @@ export function servePlugin(options: ServeOptions): Promise<{
 export function setCommandArgs(args: string[]): void
 
 // @public
+export function setDefaultUserAgent(pluginName: string, pluginVersion: string): void
+
+// @public
 export function setLogLevel(level: string): void
 
 // @public
 export function setLogLevelFromArgs(args: string[]): string | undefined
+
+// @public
+export type StripeAuth = APIKeyAuth | UATAuth
+
+// @public
+export class StripeClient {
+  constructor(options?: StripeClientOptions)
+  delete<T = unknown>(
+    path: string,
+    params?: Record<string, string>,
+    options?: StripeRequestOptions,
+  ): Promise<StripeResponse<T>>
+  get<T = unknown>(
+    path: string,
+    params?: Record<string, string>,
+    options?: StripeRequestOptions,
+  ): Promise<StripeResponse<T>>
+  post<T = unknown>(
+    path: string,
+    params?: Record<string, string>,
+    options?: StripeRequestOptions,
+  ): Promise<StripeResponse<T>>
+  request<T = unknown>(
+    method: string,
+    path: string,
+    params?: Record<string, string>,
+    options?: StripeRequestOptions,
+  ): Promise<StripeResponse<T>>
+}
+
+// @public
+export interface StripeClientOptions {
+  // (undocumented)
+  apiVersion?: string
+  // (undocumented)
+  auth?: string | StripeAuth
+  // (undocumented)
+  baseURL?: string
+  // (undocumented)
+  livemode?: boolean
+  // (undocumented)
+  profile?: Profile
+  // (undocumented)
+  stripeAccount?: string
+  // (undocumented)
+  userAgent?: string
+  // (undocumented)
+  verbose?: boolean
+}
+
+// @public
+export class StripeRequestError extends Error {
+  constructor(opts: {
+    statusCode: number
+    errorType: string
+    errorCode: string
+    requestId: string
+    body: string
+  })
+  // (undocumented)
+  readonly body: string
+  // (undocumented)
+  readonly errorCode: string
+  // (undocumented)
+  readonly errorType: string
+  // (undocumented)
+  isAPIKeyExpired(): boolean
+  // (undocumented)
+  readonly requestId: string
+  // (undocumented)
+  readonly statusCode: number
+}
+
+// @public
+export interface StripeRequestOptions {
+  // (undocumented)
+  apiVersion?: string
+  // (undocumented)
+  headers?: Record<string, string>
+  // (undocumented)
+  idempotencyKey?: string
+  // (undocumented)
+  stripeAccount?: string
+  // (undocumented)
+  stripeContext?: string
+}
+
+// @public
+export interface StripeResponse<T = unknown> {
+  // (undocumented)
+  data: T
+  // (undocumented)
+  headers: Record<string, string>
+  // (undocumented)
+  requestId: string
+  // (undocumented)
+  statusCode: number
+}
 
 // @public
 export const TerminalInfo: {
@@ -365,11 +499,31 @@ export const TerminalInfo: {
 // @public
 export const TestModeAPIKeyName = 'test_mode_api_key'
 
+// @public
+export const TestWorkspaceIDName = 'test_workspace_id'
+
 // Warning: (ae-forgotten-export) The symbol "WithoutIndexSignature" needs to be exported by the entry point index.d.ts
 //
 // @public
 export type TypedServiceImplementation<T extends UntypedServiceImplementation> =
   WithoutIndexSignature<T>
+
+// @public
+export interface UATAuth {
+  // (undocumented)
+  accountId: string
+  // (undocumented)
+  context: string
+  // (undocumented)
+  livemode?: boolean
+  // (undocumented)
+  token: string
+  // (undocumented)
+  type: 'uat'
+}
+
+// @public
+export const UATName = 'uat'
 
 // @public
 export type VersionedPlugins = Record<number, PluginCommand>

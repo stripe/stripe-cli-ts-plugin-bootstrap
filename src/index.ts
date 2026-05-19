@@ -14,6 +14,7 @@ export * from './command-tree.js'
 export * from './esbuild.js'
 export * from './interactive/index.js'
 export * from './colors.js'
+export * from './stripe-client/index.js'
 export {
   initLogger,
   log,

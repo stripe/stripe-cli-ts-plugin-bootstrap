@@ -6,11 +6,13 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
     },
     "./runtime": {
       "types": "./dist/runtime/embedded-assets.d.ts",
-      "import": "./dist/runtime/embedded-assets.js"
+      "import": "./dist/runtime/embedded-assets.js",
+      "require": "./dist/runtime/embedded-assets.js"
     },
     "./package.json": "./package.json"
   },
