@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+# Initialize a Stripe CLI plugin project.
+# This script:
+# - Prompts for plugin name (or uses --name argument)
+# - Updates configuration files with the new name
+# - Generates a magic cookie value (UUID)
+# - Adds the plugin to the local Stripe CLI manifest
+# - Creates the .plugin config file
+#
+# Usage:
+#   stripe-cli-init-plugin                    # Interactive mode
+#   stripe-cli-init-plugin --name=my-plugin   # Non-interactive mode
+#   stripe-cli-init-plugin --skip-install     # Skip dependency installation
+#
+# Run this from your plugin directory.
+
+set -euo pipefail
+
+# Find the bootstrap package directory (works whether run directly or via npx)
+BOOTSTRAP_DIR=$(node -e "console.log(require.resolve('@stripe/stripe-cli-plugin-bootstrap/package.json').replace('/package.json', ''))" 2>/dev/null || echo "")
+
+# Fallback: if we're in the bootstrap package itself
+if [[ -z "$BOOTSTRAP_DIR" ]]; then
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if [[ -f "$SCRIPT_DIR/../package.json" ]]; then
+    BOOTSTRAP_DIR="$(dirname "$SCRIPT_DIR")"
+  fi
+fi
+
+if [[ -z "$BOOTSTRAP_DIR" || ! -f "$BOOTSTRAP_DIR/scripts/lib/common.sh" ]]; then
+  echo "❌ Could not find bootstrap package. Make sure @stripe/stripe-cli-plugin-bootstrap is installed." >&2
+  exit 1
+fi
+
+# Source shared functions
+# shellcheck source=lib/common.sh
+source "$BOOTSTRAP_DIR/scripts/lib/common.sh"
+
+# Parse arguments
+NAME=""
+SKIP_INSTALL=false
+TARGET_CWD=""
+INVOCATION_DIR="$(pwd)"
+
+for arg in "$@"; do
+  case "$arg" in
+    --name=*)
+      NAME="${arg#--name=}"
+      ;;
+    --skip-install)
+      SKIP_INSTALL=true
+      ;;
+    --cwd=*)
+      TARGET_CWD="${arg#--cwd=}"
+      ;;
+    --help|-h)
+      echo "Usage: stripe-cli-init-plugin [OPTIONS]"
+      echo ""
+      echo "Options:"
+      echo "  --name=NAME       Plugin name (skips interactive prompt)"
+      echo "  --skip-install    Skip dependency installation"
+      echo "  --cwd=DIR         Run in specified directory"
+      echo "  --help, -h        Show this help message"
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $arg" >&2
+      exit 1
+      ;;
+  esac
+done
+
+# Change to target directory if specified
+if [[ -n "$TARGET_CWD" ]]; then
+  cd "$TARGET_CWD"
+fi
+
+PM=$(detect_pm)
+
+# Read existing plugin config if it exists
+if [ -f .plugin ]; then
+  read -r oldname _ < .plugin
+  if [[ -z "$NAME" && "$oldname" != "starter" && "$oldname" != "myplugin" ]]; then
+    echo "⚠️  Warning: this will overwrite your current plugin config, which might break things. Do you want to continue? y/n"
+    read -r decision
+    if [[ "$decision" != "y" ]]; then
+      echo "safely exiting."
+      exit 0
+    fi
+  fi
+else
+  oldname="myplugin"
+fi
+
+# Get plugin name (interactive or from argument)
+if [[ -z "$NAME" ]]; then
+  echo -e "\n👋 Hello! Let's get your new plugin set up, shall we?"
+  echo -e "❓ What is the top level command that will invoke your plugin in the CLI?\n🤔 Eg. for \`stripe myplugin\` the top level command would be \`myplugin\`"
+  read -r NAME
+
+  if [[ -z "$NAME" ]]; then
+    echo "Oops, I got nothing, try again:"
+    read -r NAME
+  fi
+fi
+
+# Validate the name
+if ! validate_plugin_name "$NAME"; then
+  exit 1
+fi
+
+echo -e "💁‍♀️ Great! Scaffolding your plugin for command \"$NAME\", one sec..."
+
+# Install dependencies (unless skipped)
+if [[ "$SKIP_INSTALL" == "false" ]]; then
+  run_pm install
+fi
+
+# Create bin directory
+mkdir -p "./bin/$NAME/"
+
+# Update package.json with new name if it has a placeholder (and name changed)
+if [[ "$oldname" != "$NAME" ]] && [ -f package.json ]; then
+  # Use sed with different syntax for macOS vs Linux
+  sed -i '' "s/\"name\": \"@stripe\/stripe-cli-$oldname\"/\"name\": \"@stripe\/stripe-cli-$NAME\"/g" package.json 2>/dev/null || \
+  sed -i "s/\"name\": \"@stripe\/stripe-cli-$oldname\"/\"name\": \"@stripe\/stripe-cli-$NAME\"/g" package.json
+
+  # Also try the -plugin suffix variant
+  sed -i '' "s/\"name\": \"@stripe\/stripe-cli-$oldname-plugin\"/\"name\": \"@stripe\/stripe-cli-$NAME-plugin\"/g" package.json 2>/dev/null || \
+  sed -i "s/\"name\": \"@stripe\/stripe-cli-$oldname-plugin\"/\"name\": \"@stripe\/stripe-cli-$NAME-plugin\"/g" package.json
+fi
+
+# Update README if it exists (and name changed)
+if [[ "$oldname" != "$NAME" ]] && [ -f README.md ]; then
+  sed -i '' "s/$oldname/$NAME/g" README.md 2>/dev/null || \
+  sed -i "s/$oldname/$NAME/g" README.md
+fi
+
+# Generate new UUID for handshake (magic cookie)
+handshake=$(generate_uuid)
+
+# Add to local Stripe CLI manifest using bootstrap tool
+node "$BOOTSTRAP_DIR/dist/cli-tools/addPluginToManifest.js" "$NAME" "$handshake"
+
+# Save plugin config
+echo "$NAME $handshake" > .plugin
+
+echo -e "\n🌈 Plugin \"$NAME\" initialized!"
+echo -e "   Magic cookie: $handshake"
+echo -e "   Config saved to: .plugin"
+
+# Determine the exec command for running bins
+case "$PM" in
+  yarn) PM_EXEC="yarn" ;;
+  pnpm) PM_EXEC="pnpm exec" ;;
+  *) PM_EXEC="npx" ;;
+esac
+
+echo -e "\nNext steps:"
+# If we changed directories, tell user to cd there first
+if [[ -n "$TARGET_CWD" && "$INVOCATION_DIR" != "$(pwd)" ]]; then
+  echo -e "  cd $TARGET_CWD"
+fi
+echo -e "  $PM_EXEC stripe-cli-install-plugin"
+echo -e "  stripe $NAME hello"
+echo ""

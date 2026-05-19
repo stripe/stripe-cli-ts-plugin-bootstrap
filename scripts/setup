@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Setup script for installing dependencies and registering the plugin locally.
+# This script:
+# - Reads plugin config from .plugin file
+# - Installs dependencies
+# - Adds plugin to local Stripe CLI manifest
+#
+# Run this from your plugin directory.
+
+set -euo pipefail
+
+# Find the bootstrap package directory (works whether run directly or via npx)
+BOOTSTRAP_DIR=$(node -e "console.log(require.resolve('@stripe/stripe-cli-plugin-bootstrap/package.json').replace('/package.json', ''))" 2>/dev/null || echo "")
+
+# Fallback: if we're in the bootstrap package itself
+if [[ -z "$BOOTSTRAP_DIR" ]]; then
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if [[ -f "$SCRIPT_DIR/../package.json" ]]; then
+    BOOTSTRAP_DIR="$(dirname "$SCRIPT_DIR")"
+  fi
+fi
+
+if [[ -z "$BOOTSTRAP_DIR" || ! -f "$BOOTSTRAP_DIR/scripts/lib/common.sh" ]]; then
+  echo "❌ Could not find bootstrap package. Make sure @stripe/stripe-cli-plugin-bootstrap is installed." >&2
+  exit 1
+fi
+
+# Source shared functions
+# shellcheck source=lib/common.sh
+source "$BOOTSTRAP_DIR/scripts/lib/common.sh"
+
+require_plugin_file
+read_plugin_config
+
+echo -e "💁‍♀️ Ok! Setting up plugin \"$PLUGIN_NAME\", one sec..."
+
+# Install dependencies
+run_pm install
+
+# Create bin directory
+mkdir -p "./bin/$PLUGIN_NAME/"
+
+# Add to local Stripe CLI manifest using bootstrap tool
+node "$BOOTSTRAP_DIR/dist/cli-tools/addPluginToManifest.js" "$PLUGIN_NAME" "$PLUGIN_HANDSHAKE"
+
+PM=$(detect_pm)
+echo -e "\n🌈 Plugin \"$PLUGIN_NAME\" is set up!"
+echo -e "\nNext steps:"
+echo -e "  1. Run '$PM run build' to build your plugin"
+echo -e "  2. Run '$PM run install-plugin' to install locally"
+echo -e "  3. Run 'stripe $PLUGIN_NAME --help' to test\n"

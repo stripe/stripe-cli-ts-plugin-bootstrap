@@ -1,0 +1,27 @@
+{
+  "name": "@stripe/stripe-cli-plugin-releaser",
+  "version": "0.0.0",
+  "description": "Release automation scripts for Stripe CLI plugins",
+  "type": "commonjs",
+  "bin": {
+    "get-target-manifest-file": "dist/getTargetManifestFile.js",
+    "download-manifest": "dist/downloadManifest.js",
+    "update-manifest": "dist/updateManifest.js",
+    "publish-plugin": "dist/publishPlugin.js"
+  },
+  "scripts": {
+    "build": "pnpm compile:ts",
+    "compile:ts": "tsc"
+  },
+  "author": "",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@actions/core": "^1.10.0",
+    "@stripe/stripe-cli-plugin-bootstrap": "^0.0.13",
+    "@types/node": "^24.3.1",
+    "axios": "^1.7.9",
+    "smol-toml": "^1.6.0",
+    "tsx": "^4.21.0",
+    "typescript": "6.0.3"
+  }
+}

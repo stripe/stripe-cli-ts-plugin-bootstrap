@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+# Build the plugin locally.
+# Supports two modes:
+#   Default (no flag): Build as native binary
+#   --js-bundle: Build as JavaScript bundle (requires Node.js runtime)
+#
+# Run this from your plugin directory.
+
+set -euo pipefail
+
+# Parse build mode flag (default to binary)
+BUILD_MODE="binary"
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --js-bundle)
+      BUILD_MODE="bundle"
+      shift
+      ;;
+    *)
+      echo "❌ Unknown option: $1"
+      echo "Usage: build-local [--js-bundle]"
+      exit 1
+      ;;
+  esac
+done
+
+# Find the bootstrap package directory (works whether run directly or via npx)
+BOOTSTRAP_DIR=$(node -e "console.log(require.resolve('@stripe/stripe-cli-plugin-bootstrap/package.json').replace('/package.json', ''))" 2>/dev/null || echo "")
+
+# Fallback: if we're in the bootstrap package itself
+if [[ -z "$BOOTSTRAP_DIR" ]]; then
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if [[ -f "$SCRIPT_DIR/../package.json" ]]; then
+    BOOTSTRAP_DIR="$(dirname "$SCRIPT_DIR")"
+  fi
+fi
+
+if [[ -z "$BOOTSTRAP_DIR" || ! -f "$BOOTSTRAP_DIR/scripts/lib/common.sh" ]]; then
+  echo "❌ Could not find bootstrap package. Make sure @stripe/stripe-cli-plugin-bootstrap is installed." >&2
+  exit 1
+fi
+
+# Source shared functions
+# shellcheck source=lib/common.sh
+source "$BOOTSTRAP_DIR/scripts/lib/common.sh"
+
+require_plugin_file
+read_plugin_config
+
+if [ "$BUILD_MODE" = "bundle" ]; then
+  echo "👷‍♀️ building $PLUGIN_NAME plugin as JS bundle (local standalone)..."
+
+  # Build the bundle
+  "$BOOTSTRAP_DIR/scripts/build-bundle.sh" "./dist"
+
+  BUILD_DIR="./bin/$PLUGIN_NAME/local.build.dev"
+  BUILD_PATH="$BUILD_DIR/stripe-cli-$PLUGIN_NAME"
+
+  echo "📦 copying bundle to build location..."
+  mkdir -p "$BUILD_DIR"
+  cp dist/bundle.js "$BUILD_PATH"
+  chmod +x "$BUILD_PATH"
+
+  # Copy native modules (.node files) if they exist
+  if compgen -G "dist/*.node" > /dev/null; then
+    cp dist/*.node "$BUILD_DIR/"
+    echo "   ✓ Copied native modules"
+  fi
+
+  # Copy all subdirectories from dist/ (dependencies, static assets, etc.)
+  # This includes node_modules, sdk-bases, openapi, templates, assets, or any other plugin-specific directories
+  if [[ -d "dist" ]]; then
+    for dir in dist/*/; do
+      if [[ -d "$dir" ]]; then
+        dirname=$(basename "$dir")
+        cp -r "$dir" "$BUILD_DIR/"
+        echo "   ✓ Copied dist/$dirname/"
+      fi
+    done
+  fi
+
+  echo "🔍 checking for this plugin in the local plugin manifest..."
+  # Detect Node.js major version for Runtime field
+  NODE_VERSION=$(node -e "console.log(process.versions.node.split('.')[0])")
+  node "$BOOTSTRAP_DIR/dist/cli-tools/addPluginToManifest.js" "$PLUGIN_NAME" "$PLUGIN_HANDSHAKE" "$NODE_VERSION"
+
+else
+  # Binary mode (default)
+  echo "👷‍♀️ building $PLUGIN_NAME plugin as native binary (local standalone)..."
+
+  TARGET=$(get_platform_target)
+  # When building a single target, build_binaries.sh doesn't add the
+  # platform/arch suffix — see scripts/build_binaries.sh.
+  SRC_PATH="./bin/stripe-cli-$PLUGIN_NAME"
+  BUILD_PATH="./bin/$PLUGIN_NAME/local.build.dev/stripe-cli-$PLUGIN_NAME"
+
+  # Build binary for current platform
+  "$BOOTSTRAP_DIR/scripts/build_binaries.sh" "./bin" "$TARGET"
+
+  echo "📦 copying binary to build location..."
+  mkdir -p "$(dirname "$BUILD_PATH")"
+  cp "$SRC_PATH" "$BUILD_PATH"
+  chmod +x "$BUILD_PATH"
+
+  for entry in ./bin/*; do
+    if [[ "$entry" == "$SRC_PATH" ]]; then
+      continue
+    fi
+    cp -R "$entry" "$(dirname "$BUILD_PATH")/"
+    echo "   ✓ Copied $(basename "$entry")"
+  done
+
+  echo "🔍 checking for this plugin in the local plugin manifest..."
+  # Binary mode doesn't need Node.js version (no Runtime field)
+  node "$BOOTSTRAP_DIR/dist/cli-tools/addPluginToManifest.js" "$PLUGIN_NAME" "$PLUGIN_HANDSHAKE"
+fi
+
+echo "🧮 updating checksum in the local plugin manifest..."
+CHECKSUM=$(shasum -a 256 -b "$BUILD_PATH" | awk '{print $1}')
+node "$BOOTSTRAP_DIR/dist/cli-tools/updateChecksum.js" "$PLUGIN_NAME" "$CHECKSUM"
+
+echo "✅ new build is ready at: $BUILD_PATH"

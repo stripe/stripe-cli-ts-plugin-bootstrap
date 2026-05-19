@@ -1,0 +1,208 @@
+#!/usr/bin/env bash
+# Creates a new Stripe CLI plugin project from scratch.
+# This script:
+# - Prompts for plugin name, description, and package manager
+# - Copies template files from templates/plugin/
+# - Substitutes placeholders with user-provided values
+# - Installs dependencies and builds the project
+# - Calls init to generate UUID and register with Stripe CLI
+#
+# Usage: npx new-plugin
+
+set -euo pipefail
+
+# Find the bootstrap package directory
+# Resolve the real path of this script (follows symlinks)
+# macOS doesn't have readlink -f, so we use a portable approach
+resolve_path() {
+  local path="$1"
+  while [[ -L "$path" ]]; do
+    local dir
+    dir="$(cd "$(dirname "$path")" && pwd)"
+    path="$(readlink "$path")"
+    [[ "$path" != /* ]] && path="$dir/$path"
+  done
+  echo "$(cd "$(dirname "$path")" && pwd)/$(basename "$path")"
+}
+
+REAL_SCRIPT="$(resolve_path "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(dirname "$REAL_SCRIPT")"
+BOOTSTRAP_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+if [[ ! -f "$BOOTSTRAP_DIR/package.json" ]]; then
+  echo "❌ Could not find bootstrap package." >&2
+  echo "   Debug: REAL_SCRIPT=$REAL_SCRIPT" >&2
+  echo "   Debug: BOOTSTRAP_DIR=$BOOTSTRAP_DIR" >&2
+  exit 1
+fi
+
+TEMPLATE_DIR="$BOOTSTRAP_DIR/templates/plugin"
+
+if [[ ! -d "$TEMPLATE_DIR" ]]; then
+  echo "❌ Template directory not found: $TEMPLATE_DIR" >&2
+  exit 1
+fi
+
+# Source shared functions
+# shellcheck source=lib/common.sh
+source "$BOOTSTRAP_DIR/scripts/lib/common.sh"
+
+echo -e "\n🔧 Create a new Stripe CLI Plugin\n"
+
+# Prompt for plugin name
+echo -n "Plugin name: "
+read -r PLUGIN_NAME
+
+while ! validate_plugin_name "$PLUGIN_NAME"; do
+  echo -n "Plugin name: "
+  read -r PLUGIN_NAME
+done
+
+# Check if directory already exists
+if [[ -d "$PLUGIN_NAME" ]]; then
+  echo "❌ Directory \"$PLUGIN_NAME\" already exists. Please choose a different name." >&2
+  exit 1
+fi
+
+# Prompt for description (optional)
+echo -n "Description (optional): "
+read -r DESCRIPTION
+DESCRIPTION="${DESCRIPTION:-Stripe CLI ${PLUGIN_NAME} plugin}"
+
+# Prompt for package manager
+echo "Package manager:"
+echo "  1) pnpm (default)"
+echo "  2) npm"
+echo "  3) yarn"
+echo -n "Choice [1]: "
+read -r PM_CHOICE
+
+case "${PM_CHOICE:-1}" in
+  1|"") PM="pnpm" ;;
+  2) PM="npm" ;;
+  3) PM="yarn" ;;
+  *) PM="pnpm" ;;
+esac
+
+# Derived values
+PLUGIN_CLASS="$(to_pascal_case "$PLUGIN_NAME")Plugin"
+NODE_VERSION=$(cat "$BOOTSTRAP_DIR/.node-version" 2>/dev/null || echo "22.18.0")
+PROJECT_DIR="$(pwd)/$PLUGIN_NAME"
+
+# Package manager field for package.json
+if [[ "$PM" == "pnpm" ]]; then
+  PNPM_VERSION=$(pnpm --version 2>/dev/null || echo "")
+  if [[ -n "$PNPM_VERSION" ]]; then
+    PM_FIELD="  \"packageManager\": \"pnpm@$PNPM_VERSION\","
+  else
+    PM_FIELD="  \"packageManager\": \"pnpm\","
+  fi
+else
+  PM_FIELD=""
+fi
+
+echo -e "\nCreating $PLUGIN_NAME..."
+
+# Create project directory structure
+mkdir -p "$PROJECT_DIR/src/commands/hello"
+echo "  ✓ Created project directory"
+
+# Process a template file: substitute placeholders and write to destination
+process_template() {
+  local src="$1"
+  local dest="$2"
+
+  sed -e "s|{{PLUGIN_NAME}}|$PLUGIN_NAME|g" \
+      -e "s|{{PLUGIN_CLASS}}|$PLUGIN_CLASS|g" \
+      -e "s|{{DESCRIPTION}}|$DESCRIPTION|g" \
+      -e "s|{{NODE_VERSION}}|$NODE_VERSION|g" \
+      -e "s|{{PM_FIELD}}|$PM_FIELD|g" \
+      "$src" > "$dest"
+}
+
+# Copy and process root-level template files
+for file in "$TEMPLATE_DIR"/*; do
+  filename=$(basename "$file")
+
+  if [[ -d "$file" ]]; then
+    # Skip directories, we handle src separately
+    continue
+  fi
+
+  if [[ "$filename" == *.tmpl ]]; then
+    # Process template file (remove .tmpl suffix)
+    dest_name="${filename%.tmpl}"
+    process_template "$file" "$PROJECT_DIR/$dest_name"
+  elif [[ "$filename" == "gitignore" ]]; then
+    # Special case: gitignore -> .gitignore
+    cp "$file" "$PROJECT_DIR/.gitignore"
+  else
+    # Copy as-is
+    cp "$file" "$PROJECT_DIR/$filename"
+  fi
+done
+
+# Copy and process src directory
+shopt -s nullglob
+for file in "$TEMPLATE_DIR/src"/*.tmpl "$TEMPLATE_DIR/src"/*.ts; do
+  filename=$(basename "$file")
+
+  if [[ "$filename" == *.tmpl ]]; then
+    dest_name="${filename%.tmpl}"
+    process_template "$file" "$PROJECT_DIR/src/$dest_name"
+  else
+    cp "$file" "$PROJECT_DIR/src/$filename"
+  fi
+done
+shopt -u nullglob
+
+# Copy commands directory (no templates needed)
+cp -r "$TEMPLATE_DIR/src/commands/"* "$PROJECT_DIR/src/commands/"
+
+echo "  ✓ Generated config files"
+echo "  ✓ Generated source files"
+
+# Install dependencies
+echo "  ⏳ Installing dependencies..."
+echo ""
+cd "$PROJECT_DIR"
+if [[ "$PM" == "yarn" ]]; then
+  yarn
+else
+  $PM install
+fi
+echo ""
+echo "  ✓ Installed dependencies"
+
+# Pin bootstrap version after install
+RESOLVED_VERSION=$(node -e "try { console.log(require('@stripe/stripe-cli-plugin-bootstrap/package.json').version) } catch { console.log('') }" 2>/dev/null || echo "")
+if [[ -n "$RESOLVED_VERSION" ]]; then
+  node -e "
+    const fs = require('fs');
+    const pkg = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
+    pkg.dependencies['@stripe/stripe-cli-plugin-bootstrap'] = '^$RESOLVED_VERSION';
+    fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+  "
+  echo "  ✓ Pinned bootstrap version to ^$RESOLVED_VERSION"
+else
+  echo "  ⚠ Could not pin bootstrap version (using *)"
+fi
+
+# Build the project
+echo "  ⏳ Building project..."
+echo ""
+if [[ "$PM" == "yarn" ]]; then
+  yarn build
+else
+  $PM run build
+fi
+echo ""
+echo "  ✓ Built project"
+
+# Initialize as Stripe CLI plugin (generates UUID, creates .plugin, registers with CLI)
+# Use the bin from the project's node_modules (bootstrap is a dependency)
+# Pass --cwd so init knows the target directory and can print appropriate next steps
+echo "  ⏳ Initializing Stripe CLI plugin..."
+npx stripe-cli-init-plugin --name="$PLUGIN_NAME" --skip-install --cwd="$PROJECT_DIR"
+
+echo -e "\n✅ Successfully created $PLUGIN_NAME!"

@@ -1,0 +1,31 @@
+---
+globs: **/*.ts
+alwaysApply: false
+---
+
+# Type guards instead of optimistic casting
+
+Instead of unsafe type casting, use built-in and user-defined type guards to ensure that runtime checking for value types is performed, and in alignment with the type information evaluated at build time.
+
+# No non-null assertions operator (!), except in tests
+
+Use type guards instead
+
+# No empty catch blocks
+
+Catch blocks should throw an informative error, using the `cause` field where possible.
+
+For example
+
+```ts
+try {
+  //...
+} catch (err: unknown) {
+  if (err instanceof Error) {
+    throw new Erorr("<informative message goes here>", { cause: err });
+  } else {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    throw new Error(`<informative message goes here>\n${err as any}`);
+  }
+}
+```

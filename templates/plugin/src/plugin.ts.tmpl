@@ -1,0 +1,22 @@
+import {
+  PluginCommand,
+  getPluginYargs,
+  GlobalFlags,
+} from '@stripe/stripe-cli-plugin-bootstrap'
+import type { Argv } from 'yargs'
+import * as commands from './commands'
+
+export class {{PLUGIN_CLASS}} implements PluginCommand {
+  private pluginYargs: Argv<GlobalFlags>
+
+  constructor() {
+    this.pluginYargs = getPluginYargs('{{PLUGIN_NAME}}')
+    for (const cmd of Object.values(commands)) {
+      this.pluginYargs = cmd.connect(this.pluginYargs)
+    }
+  }
+
+  async runCommand(args: string[]): Promise<void> {
+    await this.pluginYargs.parseAsync(args)
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/api-extractor/v7/api-extractor.schema.json",
+  "projectFolder": "../../node_modules/@grpc/grpc-js",
+  "mainEntryPointFilePath": "<projectFolder>/build/src/index.d.ts",
+  "docModel": {
+    "enabled": true,
+    "apiJsonFilePath": "../../temp/@grpc/grpc-js.api.json"
+  },
+  "compiler": {
+    "overrideTsconfig": {
+      "compilerOptions": {
+        "skipLibCheck": true,
+        "strict": false
+      },
+      "files": ["<projectFolder>/build/src/index.d.ts"]
+    }
+  },
+  "apiReport": {
+    "enabled": false
+  },
+  "dtsRollup": {
+    "enabled": false
+  }
+}

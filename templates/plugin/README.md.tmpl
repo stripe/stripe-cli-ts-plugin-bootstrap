@@ -1,0 +1,69 @@
+# {{PLUGIN_NAME}}
+
+{{DESCRIPTION}}
+
+## Installation
+
+```bash
+# Install dependencies
+pnpm install
+
+# Build the plugin
+pnpm build
+
+# Install to Stripe CLI
+pnpm install-plugin
+```
+
+## Usage
+
+```bash
+stripe {{PLUGIN_NAME}} hello
+stripe {{PLUGIN_NAME}} hello --name="World"
+```
+
+## Development
+
+```bash
+# Watch mode
+pnpm dev
+
+# Run tests
+pnpm test
+
+# Lint
+pnpm lint
+```
+
+## Adding Commands
+
+1. Create a new directory in `src/commands/` for your command
+2. Create an `index.ts` file that exports a command object with a `connect` method
+3. Export your command from `src/commands/index.ts`
+
+Example:
+
+```typescript
+// src/commands/my-command/index.ts
+import type { GlobalFlags } from '@stripe/stripe-cli-plugin-bootstrap'
+import type { Argv } from 'yargs'
+
+export const myCommand = {
+  connect(yargs: Argv<GlobalFlags>): Argv<GlobalFlags> {
+    return yargs.command(
+      'my-command',
+      'Description of my command',
+      y => y,
+      async args => {
+        console.log('Running my command!')
+      },
+    )
+  },
+}
+```
+
+Then add to `src/commands/index.ts`:
+
+```typescript
+export { myCommand } from './my-command'
+```

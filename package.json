@@ -1,0 +1,113 @@
+{
+  "name": "@stripe/stripe-cli-plugin-bootstrap",
+  "version": "0.4.0",
+  "description": "Bootstrap utilities for TypeScript Stripe CLI plugins",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime/embedded-assets.d.ts",
+      "import": "./dist/runtime/embedded-assets.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "packageManager": "pnpm@10.15.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/stripe/stripe-cli-ts-plugin-bootstrap.git"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "bin": {
+    "new-plugin": "./scripts/new-plugin",
+    "stripe-cli-init-plugin": "./scripts/init",
+    "stripe-cli-setup-plugin": "./scripts/setup",
+    "stripe-cli-build-local": "./scripts/build-local",
+    "stripe-cli-install-plugin": "./scripts/install-plugin",
+    "stripe-cli-build-binaries": "./scripts/build_binaries.sh",
+    "stripe-cli-build-bundle": "./scripts/build-bundle.sh",
+    "stripe-cli-generate-embedded-manifest": "./scripts/generate-embedded-manifest.sh",
+    "stripe-cli-gen-proto": "./scripts/gen-proto",
+    "stripe-cli-update-checksum": "./dist/cli-tools/updateChecksum.js",
+    "stripe-cli-add-to-manifest": "./dist/cli-tools/addPluginToManifest.js",
+    "stripe-cli-get-target-manifest-file": "./scripts/release/dist/getTargetManifestFile.js",
+    "stripe-cli-download-manifest": "./scripts/release/dist/downloadManifest.js",
+    "stripe-cli-update-manifest": "./scripts/release/dist/updateManifest.js",
+    "stripe-cli-publish-plugin": "./scripts/release/dist/publishPlugin.js"
+  },
+  "scripts": {
+    "api:extract": "api-extractor run --local",
+    "api:extract:deps": "api-extractor run --local --config ./scripts/api-extractor/grpc-js.json && node ./scripts/rename-grpc-json.cjs && mkdir -p temp/combined && cp -f temp/stripe-cli-plugin-bootstrap.api.json temp/combined/ && cp -f temp/@grpc/grpc-js.api.json temp/combined/",
+    "build": "pnpm compile:ts && pnpm compile:release && pnpm api:extract && pnpm api:extract:deps && pnpm compile:docs",
+    "compile:ts": "tsc && pnpm run copy-assets",
+    "compile:docs": "api-documenter markdown --input ./temp/combined --output ./docs && pnpm fix:format",
+    "compile:release": "tsc -p scripts/release",
+    "copy-assets": "cp -R protos dist/protos 2>/dev/null || true",
+    "clean": "rimraf dist docs etc/* temp prebuilds scripts/release/dist",
+    "gen:proto": "./scripts/gen-proto src/grpc/proto",
+    "fix": "pnpm fix:all",
+    "fix:all": "pnpm fix:eslint && pnpm fix:format",
+    "fix:eslint": "eslint . --fix",
+    "fix:format": "prettier --write .",
+    "lint": "pnpm lint:all",
+    "lint:all": "pnpm lint:eslint && pnpm lint:typecheck && pnpm lint:format",
+    "lint:eslint": "eslint .",
+    "lint:format": "prettier --check .",
+    "lint:typecheck": "tsc --noEmit",
+    "prepare": "tsc && cp -R protos dist/protos 2>/dev/null || true",
+    "prepublishOnly": "pnpm build",
+    "test": "vitest run",
+    "test:smoke": "tsx scripts/smoke-binary.ts",
+    "test:smoke:cross": "tsx scripts/smoke-cross-compile.ts",
+    "changeset": "changeset",
+    "version-package": "changeset version",
+    "release": "changeset publish"
+  },
+  "dependencies": {
+    "@clack/prompts": "1.3.0",
+    "@grpc/grpc-js": "^1.14.3",
+    "@grpc/proto-loader": "^0.8.0",
+    "@iarna/toml": "^2.2.5",
+    "google-proto-files": "5.0.1",
+    "jiti": "^2.6.1",
+    "picocolors": "^1.1.1",
+    "protobufjs": "^8.2.0",
+    "smol-toml": "^1.6.1",
+    "yargs": "^18.0.0",
+    "yargs-parser": "^22.0.0"
+  },
+  "devDependencies": {
+    "@actions/core": "^3.0.1",
+    "@changesets/changelog-github": "^0.6.0",
+    "@changesets/cli": "^2.31.0",
+    "@eslint/js": "^10.0.1",
+    "@microsoft/api-documenter": "^7.30.5",
+    "@microsoft/api-extractor": "^7.58.7",
+    "@protobuf-ts/protoc": "^2.11.1",
+    "@types/node": "^25.6.0",
+    "@types/yargs": "^17.0.35",
+    "@types/yargs-parser": "^21.0.3",
+    "axios": "^1.16.0",
+    "esbuild": "^0.28.0",
+    "eslint": "^10.3.0",
+    "prettier": "^3.8.3",
+    "rimraf": "^6.1.3",
+    "ts-proto": "^2.11.7",
+    "tsx": "^4.21.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "^8.59.2",
+    "vitest": "^4.1.5"
+  },
+  "files": [
+    "dist",
+    "bin",
+    "binaries",
+    "protos",
+    "scripts",
+    "templates"
+  ]
+}

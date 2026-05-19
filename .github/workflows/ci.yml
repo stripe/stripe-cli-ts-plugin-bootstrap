@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-lint-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read Node version
+        id: nodever
+        run: echo "node-version=$(cat .node-version)" >> "$GITHUB_OUTPUT"
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ steps.nodever.outputs.node-version }}
+          cache: pnpm
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .tool-versions
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test
+
+      - name: Tier 1 smoke (host linux-x64 binary boots + handshakes + exits on SIGTERM)
+        run: pnpm test:smoke
+
+      - name: Changeset status
+        if: github.event_name == 'pull_request'
+        run: pnpm exec changeset status --since=origin/master
+
+      - name: Check docs are up-to-date
+        run: |
+          # The build step above already regenerated docs, so check if git detects any changes
+          if ! git diff --quiet --exit-code docs/; then
+            echo "❌ Documentation is out of date!"
+            echo ""
+            echo "The committed docs differ from what should be generated."
+            echo "The following files have changed after regeneration:"
+            git diff --name-only docs/
+            echo ""
+            echo "Please run 'pnpm build' and commit the changes."
+            echo ""
+            echo "Differences:"
+            git diff docs/
+            exit 1
+          else
+            echo "✅ Documentation is up-to-date"
+          fi

@@ -1,0 +1,18 @@
+#!/usr/bin/env node
+import { servePlugin } from '@stripe/stripe-cli-plugin-bootstrap'
+import { {{PLUGIN_CLASS}} } from './plugin'
+
+async function main() {
+  await servePlugin({
+    versionedPlugins: {
+      2: new {{PLUGIN_CLASS}}(),
+    },
+    address: process.env.PLUGIN_ADDRESS || '127.0.0.1:0',
+    networkType: 'tcp'
+  })
+}
+
+main().catch(err => {
+  console.error('Plugin startup failed:', err)
+  process.exit(1)
+})
