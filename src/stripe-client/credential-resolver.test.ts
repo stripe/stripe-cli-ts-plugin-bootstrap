@@ -7,6 +7,7 @@ import { ProfileCredentialResolver } from './credential-resolver.js'
 function mockProfile(overrides: Partial<Profile> = {}): Profile {
   return {
     profileName: 'default',
+    apiKey: '',
     getUAT: vi.fn().mockResolvedValue(null),
     getAPIKey: vi.fn().mockResolvedValue('sk_test_mock'),
     getAccountID: vi.fn().mockResolvedValue('acct_mock'),
@@ -101,5 +102,67 @@ describe('ProfileCredentialResolver', () => {
     await expect(resolver.resolve(false)).rejects.toThrow(
       "No test_workspace_id configured for profile 'myprofile'",
     )
+  })
+
+  it('prefers --api-key flag over UAT', async () => {
+    const profile = mockProfile({
+      apiKey: 'sk_test_from_flag',
+      getUAT: vi.fn().mockResolvedValue('keyinfo_live_token'),
+    })
+    const resolver = new ProfileCredentialResolver(profile)
+
+    const auth = await resolver.resolve(false)
+    expect(auth).toEqual({ type: 'api-key', apiKey: 'sk_test_from_flag' })
+    expect(profile.getUAT).not.toHaveBeenCalled()
+  })
+
+  it('prefers STRIPE_API_KEY env var over UAT', async () => {
+    const original = process.env.STRIPE_API_KEY
+    try {
+      process.env.STRIPE_API_KEY = 'sk_test_from_env'
+      const profile = mockProfile({
+        getUAT: vi.fn().mockResolvedValue('keyinfo_live_token'),
+      })
+      const resolver = new ProfileCredentialResolver(profile)
+
+      const auth = await resolver.resolve(false)
+      expect(auth).toEqual({ type: 'api-key', apiKey: 'sk_test_from_env' })
+      expect(profile.getUAT).not.toHaveBeenCalled()
+    } finally {
+      if (original === undefined) {
+        delete process.env.STRIPE_API_KEY
+      } else {
+        process.env.STRIPE_API_KEY = original
+      }
+    }
+  })
+
+  it('falls back to UAT when no explicit API key is set', async () => {
+    const original = process.env.STRIPE_API_KEY
+    try {
+      delete process.env.STRIPE_API_KEY
+      const profile = mockProfile({
+        apiKey: '',
+        getUAT: vi.fn().mockResolvedValue('keyinfo_live_token'),
+        getAccountID: vi.fn().mockResolvedValue('acct_123'),
+        getTestWorkspaceID: vi.fn().mockReturnValue('wksp_test_xyz'),
+      })
+      const resolver = new ProfileCredentialResolver(profile)
+
+      const auth = await resolver.resolve(false)
+      expect(auth).toEqual({
+        type: 'uat',
+        token: 'keyinfo_live_token',
+        context: 'wksp_test_xyz',
+        accountId: 'acct_123',
+        livemode: false,
+      })
+    } finally {
+      if (original === undefined) {
+        delete process.env.STRIPE_API_KEY
+      } else {
+        process.env.STRIPE_API_KEY = original
+      }
+    }
   })
 })

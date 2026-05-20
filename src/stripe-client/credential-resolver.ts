@@ -5,8 +5,9 @@
  * based on the requested mode (livemode vs test) and whether a UAT is available.
  *
  * Resolution priority:
- * 1. UAT from keychain (if available) — produces UATAuth with the appropriate context
- * 2. API key from config/keychain — produces APIKeyAuth
+ * 1. Explicit API key (STRIPE_API_KEY env var or --api-key flag) — produces APIKeyAuth
+ * 2. UAT from keychain (if available) — produces UATAuth with the appropriate context
+ * 3. API key from config file — produces APIKeyAuth
  */
 
 import type { Profile } from '../config/config.js'
@@ -28,9 +29,10 @@ export interface CredentialResolver {
  * Default credential resolver that reads from the Stripe CLI Profile.
  *
  * Resolution logic:
+ * - If an explicit API key is set (env var or --api-key flag), returns APIKeyAuth immediately
  * - If a UAT is stored in the keychain, returns UATAuth with the matching context
  *   (live_context for livemode, test_workspace_id for test mode)
- * - Otherwise falls back to the API key for the given mode
+ * - Otherwise falls back to the API key from the config file
  * @public
  */
 export class ProfileCredentialResolver implements CredentialResolver {
@@ -41,6 +43,11 @@ export class ProfileCredentialResolver implements CredentialResolver {
   }
 
   async resolve(livemode: boolean): Promise<StripeAuth> {
+    const explicitKey = this.getExplicitAPIKey()
+    if (explicitKey) {
+      return { type: 'api-key', apiKey: explicitKey }
+    }
+
     const uat = await this.profile.getUAT()
     if (uat) {
       return this.buildUATAuth(uat, livemode)
@@ -48,6 +55,17 @@ export class ProfileCredentialResolver implements CredentialResolver {
 
     const apiKey = await this.profile.getAPIKey(livemode)
     return { type: 'api-key', apiKey }
+  }
+
+  private getExplicitAPIKey(): string | null {
+    const envKey = process.env.STRIPE_API_KEY
+    if (envKey) {
+      return envKey
+    }
+    if (this.profile.apiKey) {
+      return this.profile.apiKey
+    }
+    return null
   }
 
   private async buildUATAuth(token: string, livemode: boolean): Promise<UATAuth> {
