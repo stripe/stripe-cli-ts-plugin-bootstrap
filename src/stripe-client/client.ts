@@ -194,8 +194,19 @@ export class StripeClient {
       throw this.buildRequestError(response)
     }
 
+    let data: T
+    if (!response.body) {
+      data = undefined as T
+    } else {
+      try {
+        data = JSON.parse(response.body) as T
+      } catch {
+        data = response.body as T
+      }
+    }
+
     return {
-      data: JSON.parse(response.body) as T,
+      data,
       statusCode: response.statusCode,
       requestId: response.headers['request-id'] ?? '',
       headers: response.headers,

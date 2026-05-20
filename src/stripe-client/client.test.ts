@@ -21,6 +21,20 @@ describe('StripeClient', () => {
         return
       }
 
+      if (url.pathname === '/v1/no_content') {
+        res.setHeader('Request-Id', 'req_204')
+        res.writeHead(204)
+        res.end()
+        return
+      }
+
+      if (url.pathname === '/v1/plain_text') {
+        res.setHeader('Request-Id', 'req_plain')
+        res.writeHead(200, { 'Content-Type': 'text/plain' })
+        res.end('OK')
+        return
+      }
+
       if (url.pathname === '/v1/not_found') {
         res.setHeader('Request-Id', 'req_err456')
         res.writeHead(404, { 'Content-Type': 'application/json' })
@@ -84,6 +98,22 @@ describe('StripeClient', () => {
     expect(resp.data.object).toBe('charge')
     expect(resp.requestId).toBe('req_test123')
     expect(resp.statusCode).toBe(200)
+  })
+
+  it('handles 204 empty response without throwing', async () => {
+    const client = new StripeClient({ auth: 'sk_test_abc', baseURL })
+    const resp = await client.delete('/v1/no_content')
+    expect(resp.statusCode).toBe(204)
+    expect(resp.data).toBeUndefined()
+    expect(resp.requestId).toBe('req_204')
+  })
+
+  it('handles non-JSON response body without throwing', async () => {
+    const client = new StripeClient({ auth: 'sk_test_abc', baseURL })
+    const resp = await client.get<string>('/v1/plain_text')
+    expect(resp.statusCode).toBe(200)
+    expect(resp.data).toBe('OK')
+    expect(resp.requestId).toBe('req_plain')
   })
 
   it('throws StripeRequestError on 4xx', async () => {
