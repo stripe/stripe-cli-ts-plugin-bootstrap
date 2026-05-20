@@ -37,7 +37,8 @@
     "stripe-cli-get-target-manifest-file": "./scripts/release/dist/getTargetManifestFile.js",
     "stripe-cli-download-manifest": "./scripts/release/dist/downloadManifest.js",
     "stripe-cli-update-manifest": "./scripts/release/dist/updateManifest.js",
-    "stripe-cli-publish-plugin": "./scripts/release/dist/publishPlugin.js"
+    "stripe-cli-publish-plugin": "./scripts/release/dist/publishPlugin.js",
+    "stripe-cli-publish-plugin-with-admin-app": "./scripts/release/dist/publishPluginWithAdminApp.js"
   },
   "scripts": {
     "api:extract": "api-extractor run --local",
