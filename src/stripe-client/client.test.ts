@@ -172,6 +172,7 @@ describe('StripeClient with UAT auth', () => {
         res.end(
           JSON.stringify({
             authorization: req.headers['authorization'],
+            stripe_account: req.headers['stripe-account'],
             stripe_context: req.headers['stripe-context'],
             stripe_version: req.headers['stripe-version'],
           }),
@@ -307,6 +308,21 @@ describe('StripeClient with UAT auth', () => {
       { stripeContext: 'wksp_test_6R2Ech74SQ3XsOsAXxQ1AG8' },
     )
     expect(resp.data.stripe_context).toBe('wksp_test_6R2Ech74SQ3XsOsAXxQ1AG8')
+  })
+
+  it('applies constructor-level stripeAccount for UAT API requests', async () => {
+    const client = new StripeClient({
+      auth: {
+        type: 'uat',
+        token: 'keyinfo_live_abc123',
+        context: 'wksp_6OlwMt74SQtyFiRK3qSeJRw',
+        accountId: 'acct_live',
+      },
+      baseURL,
+      stripeAccount: 'acct_connect_target',
+    })
+    const resp = await client.get<{ stripe_account: string }>('/v1/echo_headers')
+    expect(resp.data.stripe_account).toBe('acct_connect_target')
   })
 })
 
@@ -472,6 +488,21 @@ describe('StripeClient with UAT auth on /ajax paths', () => {
     })
     const resp = await client.post<{ stripe_version: string }>('/ajax/settings/brand')
     expect(resp.data.stripe_version).toBe('2026-04-22.dahlia')
+  })
+
+  it('applies constructor-level stripeAccount for ajax paths', async () => {
+    const client = new StripeClient({
+      auth: {
+        type: 'uat',
+        token: 'keyinfo_live_abc123',
+        context: 'wksp_6OlwMt74SQtyFiRK3qSeJRw',
+        accountId: 'acct_1NRKwLLJDmqA11cn',
+      },
+      baseURL,
+      stripeAccount: 'acct_connect_target',
+    })
+    const resp = await client.post<{ stripe_account: string }>('/ajax/settings/brand')
+    expect(resp.data.stripe_account).toBe('acct_connect_target')
   })
 })
 
@@ -698,6 +729,21 @@ describe('StripeClient with UAT auth on /manage paths', () => {
       '/manage/apps/local',
     )
     expect(resp.data.authorization).toBeUndefined()
+  })
+
+  it('applies constructor-level stripeAccount for manage paths', async () => {
+    const client = new StripeClient({
+      auth: {
+        type: 'uat',
+        token: 'keyinfo_live_abc123',
+        context: 'wksp_6OlwMt74SQtyFiRK3qSeJRw',
+        accountId: 'acct_1NRKwLLJDmqA11cn',
+      },
+      baseURL,
+      stripeAccount: 'acct_connect_target',
+    })
+    const resp = await client.post<{ stripe_account: string }>('/manage/apps/local')
+    expect(resp.data.stripe_account).toBe('acct_connect_target')
   })
 })
 

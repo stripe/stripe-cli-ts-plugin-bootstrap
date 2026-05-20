@@ -229,12 +229,14 @@ export class StripeClient {
       'Accept-Encoding': 'identity',
     }
 
+    const stripeAccount = options?.stripeAccount ?? this.stripeAccount
+    const effectiveOptions = stripeAccount ? { ...options, stripeAccount } : options
+
     if (isUATAuth(auth)) {
-      Object.assign(headers, buildUATHeaders(auth, path, options))
+      Object.assign(headers, buildUATHeaders(auth, path, effectiveOptions))
     } else {
       headers['Authorization'] = `Bearer ${auth.apiKey}`
 
-      const stripeAccount = options?.stripeAccount ?? this.stripeAccount
       if (stripeAccount) {
         headers['Stripe-Account'] = stripeAccount
       }

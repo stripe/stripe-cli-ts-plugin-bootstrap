@@ -6,7 +6,7 @@
 
 Default credential resolver that reads from the Stripe CLI Profile.
 
-Resolution logic: - If a UAT is stored in the keychain, returns UATAuth with the matching context (live_context for livemode, test_workspace_id for test mode) - Otherwise falls back to the API key for the given mode
+Resolution logic: - If an explicit API key is set (env var or --api-key flag), returns APIKeyAuth immediately - If a UAT is stored in the keychain, returns UATAuth with the matching context (live_context for livemode, test_workspace_id for test mode) - Otherwise falls back to the API key from the config file
 
 **Signature:**
 
