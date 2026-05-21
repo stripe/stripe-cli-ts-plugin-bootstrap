@@ -1,5 +1,11 @@
 # @stripe/stripe-cli-plugin-bootstrap
 
+## 0.5.0
+
+### Minor Changes
+
+- [#4](https://github.com/stripe/stripe-cli-ts-plugin-bootstrap/pull/4) [`cf31aed`](https://github.com/stripe/stripe-cli-ts-plugin-bootstrap/commit/cf31aeddb932bef370d9639ea7b574ae66338cee) Thanks [@vcheung-stripe](https://github.com/vcheung-stripe)! - Add StripeClient with automatic credential resolution from config/keychain
+
 ## 0.4.1
 
 ### Patch Changes

@@ -1,6 +1,6 @@
 {
   "name": "@stripe/stripe-cli-plugin-bootstrap",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "Bootstrap utilities for TypeScript Stripe CLI plugins",
   "type": "module",
   "exports": {
