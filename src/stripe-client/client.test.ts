@@ -1047,6 +1047,130 @@ describe('StripeClient with profile-based auth', () => {
   })
 })
 
+describe('StripeClient request param encoding', () => {
+  let server: http.Server
+  let baseURL: string
+  let lastRequest: { url: string; body: string; contentType: string }
+
+  beforeAll(async () => {
+    server = http.createServer((req, res) => {
+      let body = ''
+      req.on('data', chunk => {
+        body += chunk
+      })
+      req.on('end', () => {
+        lastRequest = {
+          url: req.url ?? '/',
+          body,
+          contentType: req.headers['content-type'] ?? '',
+        }
+        res.setHeader('Request-Id', 'req_params')
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ ok: true }))
+      })
+    })
+
+    await new Promise<void>(resolve => {
+      server.listen(0, '127.0.0.1', resolve)
+    })
+
+    const addr = server.address()
+    if (addr && typeof addr === 'object') {
+      baseURL = `http://127.0.0.1:${addr.port}`
+    }
+  })
+
+  afterAll(async () => {
+    await new Promise<void>(resolve => {
+      server.close(() => resolve())
+    })
+  })
+
+  it('form-encodes nested objects with bracket notation for v1 POST', async () => {
+    const client = new StripeClient({ auth: 'sk_test_abc', baseURL })
+    await client.post('/v1/customers', {
+      metadata: { key1: 'val1', key2: 'val2' },
+    })
+    const params = new URLSearchParams(lastRequest.body)
+    expect(params.get('metadata[key1]')).toBe('val1')
+    expect(params.get('metadata[key2]')).toBe('val2')
+  })
+
+  it('form-encodes arrays with indexed bracket notation for v1 POST', async () => {
+    const client = new StripeClient({ auth: 'sk_test_abc', baseURL })
+    await client.post('/v1/subscriptions', {
+      items: [{ price: 'price_123' }, { price: 'price_456' }],
+    })
+    const params = new URLSearchParams(lastRequest.body)
+    expect(params.get('items[0][price]')).toBe('price_123')
+    expect(params.get('items[1][price]')).toBe('price_456')
+  })
+
+  it('form-encodes scalar values directly for v1 POST', async () => {
+    const client = new StripeClient({ auth: 'sk_test_abc', baseURL })
+    await client.post('/v1/charges', {
+      amount: 100,
+      currency: 'usd',
+      capture: true,
+    })
+    const params = new URLSearchParams(lastRequest.body)
+    expect(params.get('amount')).toBe('100')
+    expect(params.get('currency')).toBe('usd')
+    expect(params.get('capture')).toBe('true')
+  })
+
+  it('form-encodes empty object as empty value for v1 POST', async () => {
+    const client = new StripeClient({ auth: 'sk_test_abc', baseURL })
+    await client.post('/v1/customers/cus_123', { metadata: {} })
+    const params = new URLSearchParams(lastRequest.body)
+    expect(params.get('metadata')).toBe('')
+  })
+
+  it('form-encodes empty array as empty value for v1 POST', async () => {
+    const client = new StripeClient({ auth: 'sk_test_abc', baseURL })
+    await client.post('/v1/subscriptions/sub_123', { items: [] })
+    const params = new URLSearchParams(lastRequest.body)
+    expect(params.get('items')).toBe('')
+  })
+
+  it('form-encodes null as empty value for v1 POST', async () => {
+    const client = new StripeClient({ auth: 'sk_test_abc', baseURL })
+    await client.post('/v1/customers/cus_123', { description: null })
+    const params = new URLSearchParams(lastRequest.body)
+    expect(params.get('description')).toBe('')
+  })
+
+  it('JSON-encodes nested objects for v2 POST', async () => {
+    const client = new StripeClient({ auth: 'sk_test_abc', baseURL })
+    await client.post('/v2/core/events', {
+      filter: { status: 'active', types: ['charge.created'] },
+    })
+    expect(JSON.parse(lastRequest.body)).toEqual({
+      filter: { status: 'active', types: ['charge.created'] },
+    })
+  })
+
+  it('JSON-encodes nested objects for graphql POST', async () => {
+    const client = new StripeClient({ auth: 'sk_test_abc', baseURL })
+    await client.post('/graphql/myquery', {
+      query: '{ charges { id } }',
+      variables: { limit: 10, enabled: true },
+    })
+    expect(JSON.parse(lastRequest.body)).toEqual({
+      query: '{ charges { id } }',
+      variables: { limit: 10, enabled: true },
+    })
+  })
+
+  it('appends scalar query params for GET requests', async () => {
+    const client = new StripeClient({ auth: 'sk_test_abc', baseURL })
+    await client.get('/v1/charges', { limit: 10, active: true })
+    const url = new URL(lastRequest.url, baseURL)
+    expect(url.searchParams.get('limit')).toBe('10')
+    expect(url.searchParams.get('active')).toBe('true')
+  })
+})
+
 describe('StripeRequestError', () => {
   it('detects expired API key errors', () => {
     const err = new StripeRequestError({

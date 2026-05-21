@@ -9,7 +9,7 @@ Send a DELETE request to the Stripe API.
 **Signature:**
 
 ```typescript
-delete<T = unknown>(path: string, params?: Record<string, string>, options?: StripeRequestOptions): Promise<StripeResponse<T>>;
+delete<T = unknown>(path: string, params?: RequestParams, options?: StripeRequestOptions): Promise<StripeResponse<T>>;
 ```
 
 ## Parameters
@@ -44,7 +44,7 @@ params
 
 </td><td>
 
-Record&lt;string, string&gt;
+[RequestParams](./stripe-cli-plugin-bootstrap.requestparams.md)
 
 </td><td>
 

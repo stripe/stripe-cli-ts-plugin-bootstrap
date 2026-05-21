@@ -51,6 +51,35 @@ export interface StripeRequestOptions {
 }
 
 /**
+ * A JSON-compatible value for request parameters.
+ * @public
+ */
+export type RequestParamValue =
+  | string
+  | number
+  | boolean
+  | null
+  | RequestParamValue[]
+  | { [key: string]: RequestParamValue }
+
+/**
+ * Request parameters for Stripe API calls.
+ *
+ * For /v1 endpoints, values are form-encoded (top-level values are coerced to strings).
+ * For /v2 and /graphql endpoints, the entire object is JSON-serialized, supporting
+ * nested objects, arrays, numbers, and booleans.
+ * @public
+ */
+export type RequestParams = Record<string, RequestParamValue>
+
+/**
+ * Query parameters for GET requests. Only scalar values are supported since
+ * these are appended to the URL as query string parameters.
+ * @public
+ */
+export type QueryParams = Record<string, string | number | boolean>
+
+/**
  * Parsed response from a Stripe API request
  * @public
  */

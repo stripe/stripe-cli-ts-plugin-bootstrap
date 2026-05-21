@@ -9,7 +9,7 @@ Low-level request method. Handles encoding, headers, and error parsing.
 **Signature:**
 
 ```typescript
-request<T = unknown>(method: string, path: string, params?: Record<string, string>, options?: StripeRequestOptions): Promise<StripeResponse<T>>;
+request<T = unknown>(method: string, path: string, params?: RequestParams, options?: StripeRequestOptions): Promise<StripeResponse<T>>;
 ```
 
 ## Parameters
@@ -55,7 +55,7 @@ params
 
 </td><td>
 
-Record&lt;string, string&gt;
+[RequestParams](./stripe-cli-plugin-bootstrap.requestparams.md)
 
 </td><td>
 

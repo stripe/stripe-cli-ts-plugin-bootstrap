@@ -9,7 +9,7 @@ Send a GET request to the Stripe API.
 **Signature:**
 
 ```typescript
-get<T = unknown>(path: string, params?: Record<string, string>, options?: StripeRequestOptions): Promise<StripeResponse<T>>;
+get<T = unknown>(path: string, params?: QueryParams, options?: StripeRequestOptions): Promise<StripeResponse<T>>;
 ```
 
 ## Parameters
@@ -44,7 +44,7 @@ params
 
 </td><td>
 
-Record&lt;string, string&gt;
+[QueryParams](./stripe-cli-plugin-bootstrap.queryparams.md)
 
 </td><td>
 

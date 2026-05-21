@@ -817,6 +817,35 @@ Union of supported network types for the gRPC server.
 </td></tr>
 <tr><td>
 
+[QueryParams](./stripe-cli-plugin-bootstrap.queryparams.md)
+
+</td><td>
+
+Query parameters for GET requests. Only scalar values are supported since these are appended to the URL as query string parameters.
+
+</td></tr>
+<tr><td>
+
+[RequestParams](./stripe-cli-plugin-bootstrap.requestparams.md)
+
+</td><td>
+
+Request parameters for Stripe API calls.
+
+For /v1 endpoints, values are form-encoded (top-level values are coerced to strings). For /v2 and /graphql endpoints, the entire object is JSON-serialized, supporting nested objects, arrays, numbers, and booleans.
+
+</td></tr>
+<tr><td>
+
+[RequestParamValue](./stripe-cli-plugin-bootstrap.requestparamvalue.md)
+
+</td><td>
+
+A JSON-compatible value for request parameters.
+
+</td></tr>
+<tr><td>
+
 [StripeAuth](./stripe-cli-plugin-bootstrap.stripeauth.md)
 
 </td><td>

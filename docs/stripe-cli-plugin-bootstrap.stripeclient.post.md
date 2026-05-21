@@ -9,7 +9,7 @@ Send a POST request to the Stripe API.
 **Signature:**
 
 ```typescript
-post<T = unknown>(path: string, params?: Record<string, string>, options?: StripeRequestOptions): Promise<StripeResponse<T>>;
+post<T = unknown>(path: string, params?: RequestParams, options?: StripeRequestOptions): Promise<StripeResponse<T>>;
 ```
 
 ## Parameters
@@ -44,7 +44,7 @@ params
 
 </td><td>
 
-Record&lt;string, string&gt;
+[RequestParams](./stripe-cli-plugin-bootstrap.requestparams.md)
 
 </td><td>
 

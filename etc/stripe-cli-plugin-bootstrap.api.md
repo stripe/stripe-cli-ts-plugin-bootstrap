@@ -342,6 +342,9 @@ export class ProfileCredentialResolver implements CredentialResolver {
 }
 
 // @public
+export type QueryParams = Record<string, string | number | boolean>
+
+// @public
 export function redactAPIKey(apiKey: string): string
 
 // @public
@@ -349,6 +352,20 @@ export function redactArgs(args: string[]): string[]
 
 // @public
 export function registerGlobalFlags<T>(pluginYargs: Argv<T>): Argv<T & GlobalFlags>
+
+// @public
+export type RequestParams = Record<string, RequestParamValue>
+
+// @public
+export type RequestParamValue =
+  | string
+  | number
+  | boolean
+  | null
+  | RequestParamValue[]
+  | {
+      [key: string]: RequestParamValue
+    }
 
 // @public
 export function requireTTY(pluginName: string): void
@@ -395,23 +412,23 @@ export class StripeClient {
   constructor(options?: StripeClientOptions)
   delete<T = unknown>(
     path: string,
-    params?: Record<string, string>,
+    params?: RequestParams,
     options?: StripeRequestOptions,
   ): Promise<StripeResponse<T>>
   get<T = unknown>(
     path: string,
-    params?: Record<string, string>,
+    params?: QueryParams,
     options?: StripeRequestOptions,
   ): Promise<StripeResponse<T>>
   post<T = unknown>(
     path: string,
-    params?: Record<string, string>,
+    params?: RequestParams,
     options?: StripeRequestOptions,
   ): Promise<StripeResponse<T>>
   request<T = unknown>(
     method: string,
     path: string,
-    params?: Record<string, string>,
+    params?: RequestParams,
     options?: StripeRequestOptions,
   ): Promise<StripeResponse<T>>
 }

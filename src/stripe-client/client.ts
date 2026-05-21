@@ -11,6 +11,9 @@ import { ensureConfigInitialized } from '../config/config.js'
 import { ProfileCredentialResolver } from './credential-resolver.js'
 import { StripeRequestError } from './errors.js'
 import type {
+  QueryParams,
+  RequestParamValue,
+  RequestParams,
   StripeAuth,
   StripeClientOptions,
   StripeRequestOptions,
@@ -59,6 +62,36 @@ function isV2Path(path: string): boolean {
 
 function isJSONPath(path: string): boolean {
   return isV2Path(path) || path.startsWith('/graphql')
+}
+
+function flattenParams(
+  value: RequestParamValue,
+  prefix: string,
+  out: Array<[string, string]>,
+): void {
+  if (value === null) {
+    out.push([prefix, ''])
+  } else if (Array.isArray(value)) {
+    if (value.length === 0) {
+      out.push([prefix, ''])
+    } else {
+      for (let i = 0; i < value.length; i++) {
+        flattenParams(value[i], `${prefix}[${i}]`, out)
+      }
+    }
+  } else if (typeof value === 'object') {
+    const entries = Object.entries(value)
+    if (entries.length === 0) {
+      out.push([prefix, ''])
+    } else {
+      for (const [k, v] of entries) {
+        const key = prefix ? `${prefix}[${k}]` : k
+        flattenParams(v, key, out)
+      }
+    }
+  } else {
+    out.push([prefix, String(value)])
+  }
 }
 
 function redactHeaderValue(name: string, value: string): string {
@@ -123,7 +156,7 @@ export class StripeClient {
    */
   async get<T = unknown>(
     path: string,
-    params?: Record<string, string>,
+    params?: QueryParams,
     options?: StripeRequestOptions,
   ): Promise<StripeResponse<T>> {
     return this.request<T>('GET', path, params, options)
@@ -134,7 +167,7 @@ export class StripeClient {
    */
   async post<T = unknown>(
     path: string,
-    params?: Record<string, string>,
+    params?: RequestParams,
     options?: StripeRequestOptions,
   ): Promise<StripeResponse<T>> {
     return this.request<T>('POST', path, params, options)
@@ -145,7 +178,7 @@ export class StripeClient {
    */
   async delete<T = unknown>(
     path: string,
-    params?: Record<string, string>,
+    params?: RequestParams,
     options?: StripeRequestOptions,
   ): Promise<StripeResponse<T>> {
     return this.request<T>('DELETE', path, params, options)
@@ -157,7 +190,7 @@ export class StripeClient {
   async request<T = unknown>(
     method: string,
     path: string,
-    params?: Record<string, string>,
+    params?: RequestParams,
     options?: StripeRequestOptions,
   ): Promise<StripeResponse<T>> {
     const auth = await this.getAuth()
@@ -170,7 +203,9 @@ export class StripeClient {
     let body: string | undefined
     if (method === 'GET') {
       if (params) {
-        for (const [key, value] of Object.entries(params)) {
+        const pairs: Array<[string, string]> = []
+        flattenParams(params, '', pairs)
+        for (const [key, value] of pairs) {
           resolvedURL.searchParams.append(key, value)
         }
       }
@@ -218,7 +253,7 @@ export class StripeClient {
       return this.explicitAuth
     }
     if (!this.resolvedAuth) {
-      const profile = this.options.profile ?? (await this.getGlobalProfile())
+      const profile = this.options.profile ?? this.getGlobalProfile()
       const resolver = new ProfileCredentialResolver(profile)
       this.resolvedAuth = await resolver.resolve(this.options.livemode ?? false)
     }
@@ -269,7 +304,7 @@ export class StripeClient {
     return headers
   }
 
-  private encodeBody(path: string, params?: Record<string, string>): string | undefined {
+  private encodeBody(path: string, params?: RequestParams): string | undefined {
     if (!params || Object.keys(params).length === 0) {
       return undefined
     }
@@ -278,10 +313,9 @@ export class StripeClient {
       return JSON.stringify(params)
     }
 
-    const encoded = new url.URLSearchParams()
-    for (const [key, value] of Object.entries(params)) {
-      encoded.append(key, value)
-    }
+    const pairs: Array<[string, string]> = []
+    flattenParams(params, '', pairs)
+    const encoded = new url.URLSearchParams(pairs)
     return encoded.toString()
   }
 
