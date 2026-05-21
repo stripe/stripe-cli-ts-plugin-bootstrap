@@ -1,1 +1,3 @@
 *.json  linguist-language=JSON-with-Comments
+docs/** linguist-generated=true
+etc/stripe-cli-plugin-bootstrap.api.md linguist-generated=true

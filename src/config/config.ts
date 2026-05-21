@@ -67,6 +67,24 @@ export const TestModeAPIKeyName = 'test_mode_api_key'
 export const LiveModeAPIKeyName = 'live_mode_api_key'
 
 /**
+ * Config key name for user access token
+ * @public
+ */
+export const UATName = 'uat'
+
+/**
+ * Config key name for live workspace context
+ * @public
+ */
+export const LiveContextName = 'live_context'
+
+/**
+ * Config key name for test workspace ID
+ * @public
+ */
+export const TestWorkspaceIDName = 'test_workspace_id'
+
+/**
  * Color setting: on
  * @public
  */
@@ -233,6 +251,53 @@ export class Profile {
     }
 
     return ''
+  }
+
+  /**
+   * GetUAT retrieves the user access token from the keychain.
+   * Returns null if no UAT is configured.
+   * Ported from: profile.go UAT field + retrieveLivemodeValue(UATName)
+   */
+  async getUAT(): Promise<string | null> {
+    try {
+      return await this.retrieveLivemodeValue(UATName)
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * GetLiveContext returns the live workspace context (e.g., "wksp_123")
+   * from the config file.
+   * Ported from: profile.go LiveContext field
+   */
+  getLiveContext(): string | null {
+    const configData = this.config.readConfigFile()
+    if (configData && configData[this.profileName]) {
+      const profileData = configData[this.profileName] as Record<string, any>
+      const value = profileData[LiveContextName]
+      if (value) {
+        return value as string
+      }
+    }
+    return null
+  }
+
+  /**
+   * GetTestWorkspaceID returns the test workspace ID (e.g., "wksp_test_456")
+   * from the config file.
+   * Ported from: profile.go TestWorkspaceID field
+   */
+  getTestWorkspaceID(): string | null {
+    const configData = this.config.readConfigFile()
+    if (configData && configData[this.profileName]) {
+      const profileData = configData[this.profileName] as Record<string, any>
+      const value = profileData[TestWorkspaceIDName]
+      if (value) {
+        return value as string
+      }
+    }
+    return null
   }
 
   /**
@@ -576,6 +641,19 @@ export function getStripeCLIConfig(): Config {
     throw new Error('Config not initialized. Call initializeConfig() first.')
   }
   return stripeCliConfig
+}
+
+/**
+ * Ensures the global config singleton is initialized.
+ * If already initialized, this is a no-op. Otherwise calls initializeConfig()
+ * with default settings.
+ * @public
+ */
+export function ensureConfigInitialized(): Config {
+  if (stripeCliConfig) {
+    return stripeCliConfig
+  }
+  return initializeConfig()
 }
 
 /**

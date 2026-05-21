@@ -209,6 +209,39 @@ GetDisplayName returns the account display name Ported from: profile.go lines 24
 </td></tr>
 <tr><td>
 
+[getLiveContext()](./stripe-cli-plugin-bootstrap.profile.getlivecontext.md)
+
+</td><td>
+
+</td><td>
+
+GetLiveContext returns the live workspace context (e.g., "wksp_123") from the config file. Ported from: profile.go LiveContext field
+
+</td></tr>
+<tr><td>
+
+[getTestWorkspaceID()](./stripe-cli-plugin-bootstrap.profile.gettestworkspaceid.md)
+
+</td><td>
+
+</td><td>
+
+GetTestWorkspaceID returns the test workspace ID (e.g., "wksp_test_456") from the config file. Ported from: profile.go TestWorkspaceID field
+
+</td></tr>
+<tr><td>
+
+[getUAT()](./stripe-cli-plugin-bootstrap.profile.getuat.md)
+
+</td><td>
+
+</td><td>
+
+GetUAT retrieves the user access token from the keychain. Returns null if no UAT is configured. Ported from: profile.go UAT field + retrieveLivemodeValue(UATName)
+
+</td></tr>
+<tr><td>
+
 [retrieveLivemodeValue(key)](./stripe-cli-plugin-bootstrap.profile.retrievelivemodevalue.md)
 
 </td><td>

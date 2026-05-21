@@ -17,8 +17,10 @@ import { TypedServiceImplementation } from './server.js'
 import { TerminalInfo } from './terminal-info.js'
 import { CoreCLIHelper, CoreCLIHelperClient } from './core_cli_helper_client.js'
 import { GRPCBroker } from './grpc_broker.js'
+import { ensureConfigInitialized } from '../config/config.js'
 import { initKeychain } from '../config/keychain.js'
 import { setCommandArgs, logCommandError } from '../crash-reporter/index.js'
+import { setDefaultUserAgent } from '../stripe-client/client.js'
 
 /**
  * Plugin metadata for telemetry and analytics.
@@ -70,6 +72,10 @@ export class PluginServerImpl
     this._broker = broker
     this._pluginMetadata = pluginMetadata
     this._writeQueue = []
+
+    if (pluginMetadata) {
+      setDefaultUserAgent(pluginMetadata.name, pluginMetadata.version)
+    }
   }
 
   /**
@@ -293,6 +299,7 @@ export class PluginServerImpl
         const helperConn = await this._broker.dial(coreCliHelperId)
         coreCLIHelper = new CoreCLIHelperClient(helperConn)
         initKeychain(coreCLIHelper)
+        ensureConfigInitialized()
       } catch {
         // CoreCLIHelper unavailable (e.g. CLI version that doesn't fully implement
         // the broker dial response). Continue without it — coreCLIHelper will be

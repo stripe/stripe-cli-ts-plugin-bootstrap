@@ -61,6 +61,39 @@ Delegates all operations to the Stripe CLI host via CoreCLIHelper RPCs.
 Profile handles project-specific configurations Ported from: stripe-cli/pkg/config/profile.go lines 19-31
 
 </td></tr>
+<tr><td>
+
+[ProfileCredentialResolver](./stripe-cli-plugin-bootstrap.profilecredentialresolver.md)
+
+</td><td>
+
+Default credential resolver that reads from the Stripe CLI Profile.
+
+Resolution logic: - If an explicit API key is set (env var or --api-key flag), returns APIKeyAuth immediately - If a UAT is stored in the keychain, returns UATAuth with the matching context (live_context for livemode, test_workspace_id for test mode) - Otherwise falls back to the API key from the config file
+
+</td></tr>
+<tr><td>
+
+[StripeClient](./stripe-cli-plugin-bootstrap.stripeclient.md)
+
+</td><td>
+
+Client for making authenticated requests to the Stripe API.
+
+Supports two authentication modes: - API key: Traditional `Bearer` auth with sk_test/sk_live/rk\_ keys - UAT: User Access Token auth (see ./uat.ts for details)
+
+If no `auth` is provided, credentials are resolved lazily from the config/keychain on the first request.
+
+</td></tr>
+<tr><td>
+
+[StripeRequestError](./stripe-cli-plugin-bootstrap.striperequesterror.md)
+
+</td><td>
+
+Error thrown when a Stripe API request fails. Ported from: stripe-cli/pkg/requests/base.go RequestError
+
+</td></tr>
 </tbody></table>
 
 ## Functions
@@ -105,6 +138,15 @@ Build an args array from collected values
 </td><td>
 
 Clear the log file
+
+</td></tr>
+<tr><td>
+
+[ensureConfigInitialized()](./stripe-cli-plugin-bootstrap.ensureconfiginitialized.md)
+
+</td><td>
+
+Ensures the global config singleton is initialized. If already initialized, this is a no-op. Otherwise calls initializeConfig() with default settings.
 
 </td></tr>
 <tr><td>
@@ -274,6 +316,15 @@ Check if the host CLI is running in a TTY terminal. Uses TerminalInfo from boots
 </td></tr>
 <tr><td>
 
+[isUATAuth(auth)](./stripe-cli-plugin-bootstrap.isuatauth.md)
+
+</td><td>
+
+Returns true if the auth object is a UAT.
+
+</td></tr>
+<tr><td>
+
 [log(message, args)](./stripe-cli-plugin-bootstrap.log.md)
 
 </td><td>
@@ -376,6 +427,15 @@ In plugin mode, args arrive via gRPC (not process.argv). Call this early in `run
 </td></tr>
 <tr><td>
 
+[setDefaultUserAgent(pluginName, pluginVersion)](./stripe-cli-plugin-bootstrap.setdefaultuseragent.md)
+
+</td><td>
+
+Set the default user agent for all StripeClient instances that don't provide one explicitly. Typically called once during plugin startup with the plugin's name and version.
+
+</td></tr>
+<tr><td>
+
 [setLogLevel(level)](./stripe-cli-plugin-bootstrap.setloglevel.md)
 
 </td><td>
@@ -407,6 +467,15 @@ Description
 </th></tr></thead>
 <tbody><tr><td>
 
+[APIKeyAuth](./stripe-cli-plugin-bootstrap.apikeyauth.md)
+
+</td><td>
+
+Authentication via a traditional Stripe API key (sk_test\_\*, sk_live\_\*, rk\_\*). Uses `Authorization: Bearer <apiKey>`<!-- -->.
+
+</td></tr>
+<tr><td>
+
 [CommandInfo](./stripe-cli-plugin-bootstrap.commandinfo.md)
 
 </td><td>
@@ -421,6 +490,17 @@ Describes a plugin subcommand for manifest metadata.
 </td><td>
 
 Interface for calling back to the Stripe CLI host for helper functions.
+
+</td></tr>
+<tr><td>
+
+[CredentialResolver](./stripe-cli-plugin-bootstrap.credentialresolver.md)
+
+</td><td>
+
+Resolves authentication credentials for the StripeClient.
+
+Callers can provide a CredentialResolver instead of explicit auth to have the client automatically read credentials from the config/keychain.
 
 </td></tr>
 <tr><td>
@@ -502,6 +582,48 @@ Pre-filled arguments from the command line, used when the user provides partial 
 </td><td>
 
 Options for [servePlugin()](./stripe-cli-plugin-bootstrap.serveplugin.md)<!-- -->.
+
+</td></tr>
+<tr><td>
+
+[StripeClientOptions](./stripe-cli-plugin-bootstrap.stripeclientoptions.md)
+
+</td><td>
+
+Options for constructing a StripeClient.
+
+Authentication can be provided in two ways: - `auth`<!-- -->: Explicit credentials — either an API key string or a structured auth object. - Omit `auth`<!-- -->: Credentials are resolved lazily from the config/keychain on first request. Pass `profile` to override which profile is used (defaults to the global config profile). Pass `livemode` to control whether live or test credentials are fetched.
+
+</td></tr>
+<tr><td>
+
+[StripeRequestOptions](./stripe-cli-plugin-bootstrap.striperequestoptions.md)
+
+</td><td>
+
+Options for individual requests
+
+</td></tr>
+<tr><td>
+
+[StripeResponse](./stripe-cli-plugin-bootstrap.striperesponse.md)
+
+</td><td>
+
+Parsed response from a Stripe API request
+
+</td></tr>
+<tr><td>
+
+[UATAuth](./stripe-cli-plugin-bootstrap.uatauth.md)
+
+</td><td>
+
+Authentication via a User Access Token (UAT). Uses `Authorization: STRIPE-V2-SIG <token>`<!-- -->.
+
+A UAT targets a specific workspace context via the `Stripe-Context` header. The context determines which environment the request operates in: - Live workspace: `wksp_<id>` - Sandbox: `wksp_test_<id>` (sandbox workspace) - Legacy test mode: `wksp_test_<id>` (legacy test mode workspace)
+
+For dashboard endpoints (`/ajax`<!-- -->, `/graphql`<!-- -->, `/manage`<!-- -->), the UAT is sent as a cookie (`__Host-session`<!-- -->) and the request uses `Stripe-Account` + `Stripe-Livemode` headers instead of `Stripe-Context`<!-- -->.
 
 </td></tr>
 <tr><td>
@@ -604,6 +726,15 @@ Config key name for terms acceptance validation
 </td></tr>
 <tr><td>
 
+[LiveContextName](./stripe-cli-plugin-bootstrap.livecontextname.md)
+
+</td><td>
+
+Config key name for live workspace context
+
+</td></tr>
+<tr><td>
+
 [LiveModeAPIKeyName](./stripe-cli-plugin-bootstrap.livemodeapikeyname.md)
 
 </td><td>
@@ -631,6 +762,24 @@ TODO: Add full ANSI color support for non-terminal outputs See: https://github.c
 </td><td>
 
 Config key name for test mode API key
+
+</td></tr>
+<tr><td>
+
+[TestWorkspaceIDName](./stripe-cli-plugin-bootstrap.testworkspaceidname.md)
+
+</td><td>
+
+Config key name for test workspace ID
+
+</td></tr>
+<tr><td>
+
+[UATName](./stripe-cli-plugin-bootstrap.uatname.md)
+
+</td><td>
+
+Config key name for user access token
 
 </td></tr>
 </tbody></table>
@@ -664,6 +813,44 @@ Global flags available to all Stripe CLI plugin commands
 Union of supported network types for the gRPC server.
 
 - "tcp": bind to a host:port (e.g. `127.0.0.1:0` for an ephemeral port) - "unix": bind to a filesystem UNIX domain socket path
+
+</td></tr>
+<tr><td>
+
+[QueryParams](./stripe-cli-plugin-bootstrap.queryparams.md)
+
+</td><td>
+
+Query parameters for GET requests. Only scalar values are supported since these are appended to the URL as query string parameters.
+
+</td></tr>
+<tr><td>
+
+[RequestParams](./stripe-cli-plugin-bootstrap.requestparams.md)
+
+</td><td>
+
+Request parameters for Stripe API calls.
+
+For /v1 endpoints, values are form-encoded (top-level values are coerced to strings). For /v2 and /graphql endpoints, the entire object is JSON-serialized, supporting nested objects, arrays, numbers, and booleans.
+
+</td></tr>
+<tr><td>
+
+[RequestParamValue](./stripe-cli-plugin-bootstrap.requestparamvalue.md)
+
+</td><td>
+
+A JSON-compatible value for request parameters.
+
+</td></tr>
+<tr><td>
+
+[StripeAuth](./stripe-cli-plugin-bootstrap.stripeauth.md)
+
+</td><td>
+
+Supported authentication methods for the StripeClient.
 
 </td></tr>
 <tr><td>
