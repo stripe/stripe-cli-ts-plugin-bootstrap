@@ -14,31 +14,40 @@ describe('GRPCBroker', () => {
     vi.restoreAllMocks()
   })
 
-  it('waits for the broker stream to be established before dialing', async () => {
-    vi.useFakeTimers()
-
+  it('connects when the host announces a ConnInfo before dial() is called', async () => {
     const broker = new GRPCBroker()
-    const dialPromise = broker.dial(42)
-
-    await vi.advanceTimersByTimeAsync(20)
-
     const stream = new FakeBrokerStream()
     broker.startStream(stream as any)
 
-    await vi.advanceTimersByTimeAsync(10)
-
-    expect(stream.write).toHaveBeenCalledWith({
-      serviceId: 42,
-      network: '',
-      address: '',
-      knock: { knock: true, ack: false, error: '' },
-    })
-
+    // Host announces the service first (go-plugin v1.7.0 non-mux behavior).
     stream.emit('data', {
       serviceId: 42,
       network: 'tcp',
       address: '127.0.0.1:1234',
-      knock: { knock: false, ack: true, error: '' },
+      knock: undefined,
+    })
+
+    const client = await broker.dial(42)
+    expect(client).toBeInstanceOf(grpc.Client)
+    // Plugin never sends a knock — it only listens for announcements.
+    expect(stream.write).not.toHaveBeenCalled()
+    client.close()
+  })
+
+  it('connects when dial() is called before the announcement arrives', async () => {
+    const broker = new GRPCBroker()
+    const stream = new FakeBrokerStream()
+    broker.startStream(stream as any)
+
+    const dialPromise = broker.dial(42)
+
+    // Announcement arrives after dial().
+    await new Promise(r => setImmediate(r))
+    stream.emit('data', {
+      serviceId: 42,
+      network: 'tcp',
+      address: '127.0.0.1:1234',
+      knock: undefined,
     })
 
     const client = await dialPromise
@@ -46,17 +55,46 @@ describe('GRPCBroker', () => {
     client.close()
   })
 
-  it('times out if the broker stream is never established', async () => {
+  it('times out if no announcement arrives within 5s', async () => {
     vi.useFakeTimers()
 
     const broker = new GRPCBroker()
+    const stream = new FakeBrokerStream()
+    broker.startStream(stream as any)
+
     const dialPromise = broker.dial(7)
-    const rejection = expect(dialPromise).rejects.toThrow(
-      'Broker stream not established yet',
-    )
+    const rejection = expect(dialPromise).rejects.toThrow('Dial timeout for service 7')
 
     await vi.advanceTimersByTimeAsync(5010)
+    await rejection
+  })
 
+  it('rejects pending dials when the broker stream ends', async () => {
+    const broker = new GRPCBroker()
+    const stream = new FakeBrokerStream()
+    broker.startStream(stream as any)
+
+    const dialPromise = broker.dial(11)
+    const rejection = expect(dialPromise).rejects.toThrow('Broker stream ended')
+
+    stream.emit('end')
+    await rejection
+  })
+
+  it('rejects an explicit knock from the host (mux mode not supported)', async () => {
+    const broker = new GRPCBroker()
+    const stream = new FakeBrokerStream()
+    broker.startStream(stream as any)
+
+    const dialPromise = broker.dial(99)
+    const rejection = expect(dialPromise).rejects.toThrow(/mux mode is not supported/)
+
+    stream.emit('data', {
+      serviceId: 99,
+      network: '',
+      address: '',
+      knock: { knock: true, ack: false, error: '' },
+    })
     await rejection
   })
 })

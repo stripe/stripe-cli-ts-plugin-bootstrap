@@ -4,11 +4,15 @@ import { TypedServiceImplementation } from './server.js'
 import * as grpc from '@grpc/grpc-js'
 
 /**
- * Pending dial request waiting for a response
+ * A buffered slot for one service id. The host announces a service via a
+ * ConnInfo on the broker stream; dial(id) waits on the same slot for that
+ * announcement. Whichever side arrives first parks; the other side fulfills.
  */
-interface PendingDial {
-  resolve: (connInfo: { network: string; address: string }) => void
+interface PendingStream {
+  resolve: (connInfo: ConnInfo) => void
   reject: (err: Error) => void
+  /** Set once the announcement is in hand, in case dial() is called later. */
+  received?: ConnInfo
 }
 
 /**
@@ -17,15 +21,20 @@ interface PendingDial {
  * It is used by plugins to create multiple gRPC connections and data
  * streams between the plugin process and the host process.
  *
- * This allows a plugin to request a channel with a specific ID to connect to
- * or accept a connection from, and the broker handles the details of
- * holding these channels open while they're being negotiated.
+ * Ported from: https://github.com/hashicorp/go-plugin/blob/v1.7.0/grpc_broker.go
  *
- * Ported from: https://github.com/hashicorp/go-plugin/blob/main/grpc_broker.go
+ * Protocol (non-mux mode, which is what the Stripe CLI uses):
+ *   - The host calls `Accept(id)` on its broker, which sends a ConnInfo
+ *     `{ service_id, network, address }` (no `knock` set) over the stream
+ *     to announce a service.
+ *   - The plugin's `dial(id)` waits for that announcement and then opens a
+ *     gRPC client to the announced address.
+ *   - Announcements can arrive before or after dial(); both orderings are
+ *     supported by parking the first-arriving party on a per-id slot.
  */
 export class GRPCBroker implements TypedServiceImplementation<GRPCBrokerServer> {
   private stream: ServerDuplexStream<ConnInfo, ConnInfo> | null = null
-  private pendingDials: Map<number, PendingDial> = new Map()
+  private pending: Map<number, PendingStream> = new Map()
   private nextId = 0
   private closed = false
 
@@ -36,7 +45,6 @@ export class GRPCBroker implements TypedServiceImplementation<GRPCBrokerServer> 
   startStream: handleBidiStreamingCall<ConnInfo, ConnInfo> = call => {
     this.stream = call
 
-    // Handle incoming connection info from the host
     call.on('data', (connInfo: ConnInfo) => {
       this.handleConnInfo(connInfo)
     })
@@ -44,28 +52,29 @@ export class GRPCBroker implements TypedServiceImplementation<GRPCBrokerServer> 
     call.on('end', () => {
       this.stream = null
       this.closed = true
-      // Reject all pending dials
-      for (const [_serviceId, pending] of this.pendingDials.entries()) {
-        pending.reject(new Error('Broker stream ended'))
+      for (const [, slot] of this.pending) {
+        if (!slot.received) slot.reject(new Error('Broker stream ended'))
       }
-      this.pendingDials.clear()
+      this.pending.clear()
       call.end()
     })
 
     call.on('error', err => {
       this.stream = null
       this.closed = true
-      // Reject all pending dials
-      for (const [_serviceId, pending] of this.pendingDials.entries()) {
-        pending.reject(err)
+      for (const [, slot] of this.pending) {
+        if (!slot.received) slot.reject(err)
       }
-      this.pendingDials.clear()
+      this.pending.clear()
     })
   }
 
   /**
    * Dial opens a connection by ID.
-   * This sends a "knock" to the host and waits for the connection info response.
+   *
+   * Waits for the host to announce a ConnInfo for the given service id, then
+   * connects to the announced address. If the announcement has already
+   * arrived, dial returns immediately.
    *
    * @param serviceId - The service ID to dial (provided by the host in RPC requests)
    * @returns A gRPC client connection to the service
@@ -75,75 +84,75 @@ export class GRPCBroker implements TypedServiceImplementation<GRPCBrokerServer> 
       throw new Error('Broker is closed')
     }
 
-    if (!this.stream) {
-      // The host may send RunCommand before the broker stream is established — wait for it.
-      const deadline = Date.now() + 5000
-      while (!this.stream) {
-        if (this.closed) throw new Error('Broker is closed')
-        if (Date.now() >= deadline) throw new Error('Broker stream not established yet')
-        await new Promise(r => setTimeout(r, 10))
-      }
+    const existing = this.pending.get(serviceId)
+    if (existing?.received) {
+      this.pending.delete(serviceId)
+      return this.connectTo(existing.received)
     }
 
-    const dialPromise = new Promise<{ network: string; address: string }>(
-      (resolve, reject) => {
-        this.pendingDials.set(serviceId, { resolve, reject })
+    const connInfo = await new Promise<ConnInfo>((resolve, reject) => {
+      const slot: PendingStream = { resolve, reject }
+      this.pending.set(serviceId, slot)
 
-        // Add timeout to prevent hanging forever
-        setTimeout(() => {
-          if (this.pendingDials.has(serviceId)) {
-            this.pendingDials.delete(serviceId)
-            reject(new Error(`Dial timeout for service ${serviceId}`))
-          }
-        }, 5000) // Match Go's 5 second timeout
-      },
-    )
+      setTimeout(() => {
+        const current = this.pending.get(serviceId)
+        if (current === slot && !current.received) {
+          this.pending.delete(serviceId)
+          reject(new Error(`Dial timeout for service ${serviceId}`))
+        }
+      }, 5000)
+    })
 
-    // Send knock request to the host
-    const knockRequest: ConnInfo = {
-      serviceId,
-      network: '',
-      address: '',
-      knock: { knock: true, ack: false, error: '' },
+    return this.connectTo(connInfo)
+  }
+
+  private connectTo(connInfo: ConnInfo): grpc.Client {
+    let dialAddress = connInfo.address
+    if (connInfo.network === 'unix' && !dialAddress.startsWith('unix:')) {
+      dialAddress = `unix:${dialAddress}`
     }
-
-    this.stream.write(knockRequest)
-
-    const { network, address } = await dialPromise
-
-    // Format the address based on network type
-    // For unix sockets, gRPC needs the "unix:" prefix
-    let dialAddress = address
-    if (network === 'unix' && !address.startsWith('unix:')) {
-      dialAddress = `unix:${address}`
-    }
-
-    // Create a gRPC client to the service
-    const client = new grpc.Client(dialAddress, grpc.credentials.createInsecure())
-    return client
+    return new grpc.Client(dialAddress, grpc.credentials.createInsecure())
   }
 
   /**
-   * Handle incoming connection info from the host
+   * Handle a ConnInfo received on the broker stream.
+   *
+   * In non-mux mode (the only mode we support), the host only ever sends
+   * announcements: ConnInfo with network+address and no knock. If dial(id)
+   * is already waiting we resolve it; otherwise we park the announcement so
+   * a later dial(id) can pick it up.
    */
   private handleConnInfo(connInfo: ConnInfo): void {
-    const pending = this.pendingDials.get(connInfo.serviceId)
-    if (!pending) {
+    // Defensive: knocks aren't part of the non-mux protocol, but the proto
+    // includes the field. Reject knocks explicitly so a misconfigured host
+    // surfaces an error instead of hanging.
+    if (connInfo.knock?.knock) {
+      const pending = this.pending.get(connInfo.serviceId)
+      if (pending && !pending.received) {
+        this.pending.delete(connInfo.serviceId)
+        pending.reject(
+          new Error(
+            `Broker received an unexpected knock for service ${connInfo.serviceId}; mux mode is not supported`,
+          ),
+        )
+      }
       return
     }
 
-    if (connInfo.knock?.error) {
-      pending.reject(new Error(connInfo.knock.error))
-      this.pendingDials.delete(connInfo.serviceId)
+    const existing = this.pending.get(connInfo.serviceId)
+    if (existing && !existing.received) {
+      this.pending.delete(connInfo.serviceId)
+      existing.resolve(connInfo)
       return
     }
 
-    // The host acknowledges by sending back the address (with or without knock.ack field)
-    // If we have an address, the knock was successful
-    if (connInfo.address) {
-      pending.resolve({ network: connInfo.network, address: connInfo.address })
-      this.pendingDials.delete(connInfo.serviceId)
-    }
+    // Announcement arrived before dial(). Park it so dial() can pick it up.
+    this.pending.set(connInfo.serviceId, {
+      received: connInfo,
+      // Park noop resolve/reject so the slot's shape is stable.
+      resolve: () => {},
+      reject: () => {},
+    })
   }
 
   /**
@@ -171,10 +180,9 @@ export class GRPCBroker implements TypedServiceImplementation<GRPCBrokerServer> 
       this.stream = null
     }
 
-    // Reject all pending dials
-    for (const [_serviceId, pending] of this.pendingDials.entries()) {
-      pending.reject(new Error('Broker closed'))
+    for (const [, slot] of this.pending) {
+      if (!slot.received) slot.reject(new Error('Broker closed'))
     }
-    this.pendingDials.clear()
+    this.pending.clear()
   }
 }
