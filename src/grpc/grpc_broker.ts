@@ -3,13 +3,29 @@ import { GRPCBrokerServer, ConnInfo } from './proto/plugin/grpc_broker.js'
 import { TypedServiceImplementation } from './server.js'
 import * as grpc from '@grpc/grpc-js'
 
+const DIAL_TIMEOUT_MS = 5000
+
 /**
- * Pending dial request waiting for a response
+ * State of a per-service-id slot in the broker's pending map.
+ *
+ * Either a `dial()` call is in flight and waiting for the host's announcement
+ * (`waiter`), or the host's announcement has already arrived and is parked
+ * waiting for a future `dial()` call (`received`). The two states are mutually
+ * exclusive; whichever side arrives first parks, and the other side fulfills.
  */
-interface PendingDial {
-  resolve: (connInfo: { network: string; address: string }) => void
-  reject: (err: Error) => void
-}
+type PendingEntry =
+  | {
+      kind: 'waiter'
+      resolve: (connInfo: ConnInfo) => void
+      reject: (err: Error) => void
+      timer: ReturnType<typeof setTimeout>
+    }
+  | {
+      kind: 'received'
+      connInfo: ConnInfo
+      /** Cleared if dial() consumes the announcement before it ages out. */
+      gcTimer: ReturnType<typeof setTimeout>
+    }
 
 /**
  * GRPCBroker is responsible for brokering connections by unique ID.
@@ -17,16 +33,20 @@ interface PendingDial {
  * It is used by plugins to create multiple gRPC connections and data
  * streams between the plugin process and the host process.
  *
- * This allows a plugin to request a channel with a specific ID to connect to
- * or accept a connection from, and the broker handles the details of
- * holding these channels open while they're being negotiated.
+ * Ported from: https://github.com/hashicorp/go-plugin/blob/v1.7.0/grpc_broker.go
  *
- * Ported from: https://github.com/hashicorp/go-plugin/blob/main/grpc_broker.go
+ * Protocol (non-mux mode, which is what the Stripe CLI uses):
+ *   - The host calls `Accept(id)` on its broker, which sends a ConnInfo
+ *     `{ service_id, network, address }` (no `knock` set) over the stream
+ *     to announce a service.
+ *   - The plugin's `dial(id)` waits for that announcement and then opens a
+ *     gRPC client to the announced address.
+ *   - Announcements can arrive before or after dial(); both orderings are
+ *     supported by parking the first-arriving party on a per-id slot.
  */
 export class GRPCBroker implements TypedServiceImplementation<GRPCBrokerServer> {
   private stream: ServerDuplexStream<ConnInfo, ConnInfo> | null = null
-  private pendingDials: Map<number, PendingDial> = new Map()
-  private nextId = 0
+  private pending: Map<number, PendingEntry> = new Map()
   private closed = false
 
   /**
@@ -36,36 +56,26 @@ export class GRPCBroker implements TypedServiceImplementation<GRPCBrokerServer> 
   startStream: handleBidiStreamingCall<ConnInfo, ConnInfo> = call => {
     this.stream = call
 
-    // Handle incoming connection info from the host
     call.on('data', (connInfo: ConnInfo) => {
       this.handleConnInfo(connInfo)
     })
 
     call.on('end', () => {
-      this.stream = null
-      this.closed = true
-      // Reject all pending dials
-      for (const [_serviceId, pending] of this.pendingDials.entries()) {
-        pending.reject(new Error('Broker stream ended'))
-      }
-      this.pendingDials.clear()
+      this.tearDown(new Error('Broker stream ended'))
       call.end()
     })
 
     call.on('error', err => {
-      this.stream = null
-      this.closed = true
-      // Reject all pending dials
-      for (const [_serviceId, pending] of this.pendingDials.entries()) {
-        pending.reject(err)
-      }
-      this.pendingDials.clear()
+      this.tearDown(err)
     })
   }
 
   /**
    * Dial opens a connection by ID.
-   * This sends a "knock" to the host and waits for the connection info response.
+   *
+   * Waits for the host to announce a ConnInfo for the given service id, then
+   * connects to the announced address. If the announcement has already
+   * arrived, dial returns immediately.
    *
    * @param serviceId - The service ID to dial (provided by the host in RPC requests)
    * @returns A gRPC client connection to the service
@@ -75,85 +85,106 @@ export class GRPCBroker implements TypedServiceImplementation<GRPCBrokerServer> 
       throw new Error('Broker is closed')
     }
 
-    if (!this.stream) {
-      // The host may send RunCommand before the broker stream is established — wait for it.
-      const deadline = Date.now() + 5000
-      while (!this.stream) {
-        if (this.closed) throw new Error('Broker is closed')
-        if (Date.now() >= deadline) throw new Error('Broker stream not established yet')
-        await new Promise(r => setTimeout(r, 10))
-      }
+    const existing = this.pending.get(serviceId)
+    if (existing?.kind === 'waiter') {
+      throw new Error(`dial(${serviceId}) already in progress`)
+    }
+    if (existing?.kind === 'received') {
+      clearTimeout(existing.gcTimer)
+      this.pending.delete(serviceId)
+      return this.connectTo(existing.connInfo)
     }
 
-    const dialPromise = new Promise<{ network: string; address: string }>(
-      (resolve, reject) => {
-        this.pendingDials.set(serviceId, { resolve, reject })
+    const connInfo = await new Promise<ConnInfo>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        const current = this.pending.get(serviceId)
+        if (current?.kind === 'waiter' && current.resolve === resolve) {
+          this.pending.delete(serviceId)
+          reject(new Error(`Dial timeout for service ${serviceId}`))
+        }
+      }, DIAL_TIMEOUT_MS)
 
-        // Add timeout to prevent hanging forever
-        setTimeout(() => {
-          if (this.pendingDials.has(serviceId)) {
-            this.pendingDials.delete(serviceId)
-            reject(new Error(`Dial timeout for service ${serviceId}`))
-          }
-        }, 5000) // Match Go's 5 second timeout
-      },
-    )
+      this.pending.set(serviceId, { kind: 'waiter', resolve, reject, timer })
+    })
 
-    // Send knock request to the host
-    const knockRequest: ConnInfo = {
-      serviceId,
-      network: '',
-      address: '',
-      knock: { knock: true, ack: false, error: '' },
+    return this.connectTo(connInfo)
+  }
+
+  private connectTo(connInfo: ConnInfo): grpc.Client {
+    // Broker dial targets are loopback (TCP or unix socket) — insecure creds
+    // match what go-plugin uses and what the host expects.
+    let dialAddress = connInfo.address
+    if (connInfo.network === 'unix' && !dialAddress.startsWith('unix:')) {
+      dialAddress = `unix:${dialAddress}`
     }
-
-    this.stream.write(knockRequest)
-
-    const { network, address } = await dialPromise
-
-    // Format the address based on network type
-    // For unix sockets, gRPC needs the "unix:" prefix
-    let dialAddress = address
-    if (network === 'unix' && !address.startsWith('unix:')) {
-      dialAddress = `unix:${address}`
-    }
-
-    // Create a gRPC client to the service
-    const client = new grpc.Client(dialAddress, grpc.credentials.createInsecure())
-    return client
+    return new grpc.Client(dialAddress, grpc.credentials.createInsecure())
   }
 
   /**
-   * Handle incoming connection info from the host
+   * Handle a ConnInfo received on the broker stream.
+   *
+   * In non-mux mode (the only mode we support), the host only ever sends
+   * announcements: ConnInfo with network+address and no knock. If dial(id)
+   * is already waiting we resolve it; otherwise we park the announcement so
+   * a later dial(id) can pick it up.
    */
   private handleConnInfo(connInfo: ConnInfo): void {
-    const pending = this.pendingDials.get(connInfo.serviceId)
-    if (!pending) {
+    // Defensive: knocks aren't part of the non-mux protocol, but the proto
+    // includes the field. Reject knocks explicitly so a misconfigured host
+    // surfaces an error instead of hanging.
+    if (connInfo.knock?.knock) {
+      const pending = this.pending.get(connInfo.serviceId)
+      if (pending?.kind === 'waiter') {
+        clearTimeout(pending.timer)
+        this.pending.delete(connInfo.serviceId)
+        pending.reject(
+          new Error(
+            `Broker received an unexpected knock for service ${connInfo.serviceId}; mux mode is not supported`,
+          ),
+        )
+      }
       return
     }
 
-    if (connInfo.knock?.error) {
-      pending.reject(new Error(connInfo.knock.error))
-      this.pendingDials.delete(connInfo.serviceId)
+    const existing = this.pending.get(connInfo.serviceId)
+    if (existing?.kind === 'waiter') {
+      clearTimeout(existing.timer)
+      this.pending.delete(connInfo.serviceId)
+      existing.resolve(connInfo)
       return
     }
 
-    // The host acknowledges by sending back the address (with or without knock.ack field)
-    // If we have an address, the knock was successful
-    if (connInfo.address) {
-      pending.resolve({ network: connInfo.network, address: connInfo.address })
-      this.pendingDials.delete(connInfo.serviceId)
+    // Announcement arrived before dial(). Park it, and GC the slot after the
+    // dial-timeout window if no one ever consumes it — matches go-plugin's
+    // timeoutWait so a misbehaving host can't leak slots indefinitely.
+    if (existing?.kind === 'received') {
+      clearTimeout(existing.gcTimer)
     }
+    const gcTimer = setTimeout(() => {
+      const current = this.pending.get(connInfo.serviceId)
+      if (current?.kind === 'received' && current.connInfo === connInfo) {
+        this.pending.delete(connInfo.serviceId)
+      }
+    }, DIAL_TIMEOUT_MS)
+    this.pending.set(connInfo.serviceId, {
+      kind: 'received',
+      connInfo,
+      gcTimer,
+    })
   }
 
-  /**
-   * NextId returns a unique ID to use next.
-   *
-   * It is possible for very long-running plugin hosts to wrap this value,
-   * though it would require a very large amount of calls.
-   */
-  nextServiceId(): number {
-    return ++this.nextId
+  private tearDown(reason: Error): void {
+    this.stream = null
+    this.closed = true
+    for (const [, entry] of this.pending) {
+      if (entry.kind === 'waiter') {
+        clearTimeout(entry.timer)
+        entry.reject(reason)
+      } else {
+        clearTimeout(entry.gcTimer)
+      }
+    }
+    this.pending.clear()
   }
 
   /**
@@ -163,18 +194,9 @@ export class GRPCBroker implements TypedServiceImplementation<GRPCBrokerServer> 
     if (this.closed) {
       return
     }
-
-    this.closed = true
-
     if (this.stream) {
       this.stream.end()
-      this.stream = null
     }
-
-    // Reject all pending dials
-    for (const [_serviceId, pending] of this.pendingDials.entries()) {
-      pending.reject(new Error('Broker closed'))
-    }
-    this.pendingDials.clear()
+    this.tearDown(new Error('Broker closed'))
   }
 }

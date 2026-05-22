@@ -15,6 +15,7 @@ export default defineConfig(
         projectService: {
           allowDefaultProject: [
             'test/*.ts',
+            'test/helpers/*.ts',
             '*.mts',
             '*.ts',
             'scripts/*.ts',
