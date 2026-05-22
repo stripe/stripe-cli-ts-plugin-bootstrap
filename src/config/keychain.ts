@@ -81,6 +81,14 @@ export class Keychain {
 let globalKeychain: Keychain | null = null
 
 /**
+ * Captured reason the keychain failed to initialize, surfaced from getKeychain()
+ * so callers see "Keychain unavailable: <root cause>" instead of the misleading
+ * "Keychain not initialized" when the broker dial silently failed.
+ * @internal
+ */
+let initFailureReason: Error | null = null
+
+/**
  * Initialize the global keychain instance with a CoreCLIHelper.
  * Must be called before getKeychain() is used.
  *
@@ -89,7 +97,28 @@ let globalKeychain: Keychain | null = null
  */
 export function initKeychain(helper: CoreCLIHelper): Keychain {
   globalKeychain = new Keychain(helper)
+  initFailureReason = null
   return globalKeychain
+}
+
+/**
+ * Record why initKeychain() couldn't be called for the current command.
+ * Surfaced by getKeychain() so plugins see the actual root cause instead of
+ * the generic "not initialized" message.
+ *
+ * @internal
+ */
+export function setKeychainInitFailure(reason: Error): void {
+  initFailureReason = reason
+}
+
+/**
+ * Reset the keychain singleton. Intended for tests only.
+ * @internal
+ */
+export function resetKeychainForTests(): void {
+  globalKeychain = null
+  initFailureReason = null
 }
 
 /**
@@ -104,6 +133,11 @@ export function initKeychain(helper: CoreCLIHelper): Keychain {
  */
 export function getKeychain(): Keychain {
   if (!globalKeychain) {
+    if (initFailureReason) {
+      throw new Error(`Keychain unavailable: ${initFailureReason.message}`, {
+        cause: initFailureReason,
+      })
+    }
     throw new Error('Keychain not initialized. Call initKeychain(coreCLIHelper) first.')
   }
   return globalKeychain

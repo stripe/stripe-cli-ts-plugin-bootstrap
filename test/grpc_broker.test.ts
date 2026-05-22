@@ -97,4 +97,63 @@ describe('GRPCBroker', () => {
     })
     await rejection
   })
+
+  it('throws on a duplicate dial for the same service id', async () => {
+    const broker = new GRPCBroker()
+    const stream = new FakeBrokerStream()
+    broker.startStream(stream as any)
+
+    const first = broker.dial(50)
+    await expect(broker.dial(50)).rejects.toThrow('dial(50) already in progress')
+
+    // First dial is still in flight; resolve it so the test doesn't hang.
+    stream.emit('data', {
+      serviceId: 50,
+      network: 'tcp',
+      address: '127.0.0.1:5050',
+      knock: undefined,
+    })
+    const client = await first
+    client.close()
+  })
+
+  it('GCs a parked announcement that no one ever dials', async () => {
+    vi.useFakeTimers()
+    const broker = new GRPCBroker()
+    const stream = new FakeBrokerStream()
+    broker.startStream(stream as any)
+
+    stream.emit('data', {
+      serviceId: 77,
+      network: 'tcp',
+      address: '127.0.0.1:7777',
+      knock: undefined,
+    })
+
+    // Right after the announcement, dial(77) would succeed immediately.
+    // After the GC window, the parked announcement is dropped and dial(77)
+    // becomes a fresh waiter that ultimately times out.
+    await vi.advanceTimersByTimeAsync(5010)
+
+    const dialPromise = broker.dial(77)
+    const rejection = expect(dialPromise).rejects.toThrow('Dial timeout for service 77')
+    await vi.advanceTimersByTimeAsync(5010)
+    await rejection
+  })
+
+  it('throws Broker is closed when dialed after the stream has ended', async () => {
+    const broker = new GRPCBroker()
+    const stream = new FakeBrokerStream()
+    broker.startStream(stream as any)
+    stream.emit('end')
+
+    await expect(broker.dial(123)).rejects.toThrow('Broker is closed')
+  })
+
+  it('throws Broker is closed when dialed before any stream is attached', async () => {
+    const broker = new GRPCBroker()
+    broker.close()
+
+    await expect(broker.dial(1)).rejects.toThrow('Broker is closed')
+  })
 })

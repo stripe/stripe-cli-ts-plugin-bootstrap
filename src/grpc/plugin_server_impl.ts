@@ -18,7 +18,7 @@ import { TerminalInfo } from './terminal-info.js'
 import { CoreCLIHelper, CoreCLIHelperClient } from './core_cli_helper_client.js'
 import { GRPCBroker } from './grpc_broker.js'
 import { ensureConfigInitialized } from '../config/config.js'
-import { initKeychain } from '../config/keychain.js'
+import { initKeychain, setKeychainInitFailure } from '../config/keychain.js'
 import { setCommandArgs, logCommandError } from '../crash-reporter/index.js'
 import { setDefaultUserAgent } from '../stripe-client/client.js'
 
@@ -300,11 +300,18 @@ export class PluginServerImpl
         coreCLIHelper = new CoreCLIHelperClient(helperConn)
         initKeychain(coreCLIHelper)
         ensureConfigInitialized()
-      } catch {
+      } catch (err) {
         // CoreCLIHelper unavailable (e.g. CLI version that doesn't fully implement
-        // the broker dial response). Continue without it — coreCLIHelper will be
-        // undefined and getKeychain() will throw. Use getOptionalKeychain() if
-        // keychain access is best-effort for your plugin.
+        // the broker dial response, or a protocol-version mismatch). Log to stderr
+        // and stash the cause so getKeychain() can surface it instead of throwing
+        // a generic "Keychain not initialized" — the latter masked exactly this
+        // failure mode for users for a long time. Plugins that don't need the
+        // keychain should use getOptionalKeychain().
+        const cause = err instanceof Error ? err : new Error(String(err))
+        setKeychainInitFailure(cause)
+        process.stderr.write(
+          `[plugin-bootstrap] broker.dial(coreCLIHelperId=${coreCliHelperId}) failed: ${cause.message}\n`,
+        )
       }
     }
     return coreCLIHelper

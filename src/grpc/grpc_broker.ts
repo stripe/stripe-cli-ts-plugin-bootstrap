@@ -3,17 +3,29 @@ import { GRPCBrokerServer, ConnInfo } from './proto/plugin/grpc_broker.js'
 import { TypedServiceImplementation } from './server.js'
 import * as grpc from '@grpc/grpc-js'
 
+const DIAL_TIMEOUT_MS = 5000
+
 /**
- * A buffered slot for one service id. The host announces a service via a
- * ConnInfo on the broker stream; dial(id) waits on the same slot for that
- * announcement. Whichever side arrives first parks; the other side fulfills.
+ * State of a per-service-id slot in the broker's pending map.
+ *
+ * Either a `dial()` call is in flight and waiting for the host's announcement
+ * (`waiter`), or the host's announcement has already arrived and is parked
+ * waiting for a future `dial()` call (`received`). The two states are mutually
+ * exclusive; whichever side arrives first parks, and the other side fulfills.
  */
-interface PendingStream {
-  resolve: (connInfo: ConnInfo) => void
-  reject: (err: Error) => void
-  /** Set once the announcement is in hand, in case dial() is called later. */
-  received?: ConnInfo
-}
+type PendingEntry =
+  | {
+      kind: 'waiter'
+      resolve: (connInfo: ConnInfo) => void
+      reject: (err: Error) => void
+      timer: ReturnType<typeof setTimeout>
+    }
+  | {
+      kind: 'received'
+      connInfo: ConnInfo
+      /** Cleared if dial() consumes the announcement before it ages out. */
+      gcTimer: ReturnType<typeof setTimeout>
+    }
 
 /**
  * GRPCBroker is responsible for brokering connections by unique ID.
@@ -34,8 +46,7 @@ interface PendingStream {
  */
 export class GRPCBroker implements TypedServiceImplementation<GRPCBrokerServer> {
   private stream: ServerDuplexStream<ConnInfo, ConnInfo> | null = null
-  private pending: Map<number, PendingStream> = new Map()
-  private nextId = 0
+  private pending: Map<number, PendingEntry> = new Map()
   private closed = false
 
   /**
@@ -50,22 +61,12 @@ export class GRPCBroker implements TypedServiceImplementation<GRPCBrokerServer> 
     })
 
     call.on('end', () => {
-      this.stream = null
-      this.closed = true
-      for (const [, slot] of this.pending) {
-        if (!slot.received) slot.reject(new Error('Broker stream ended'))
-      }
-      this.pending.clear()
+      this.tearDown(new Error('Broker stream ended'))
       call.end()
     })
 
     call.on('error', err => {
-      this.stream = null
-      this.closed = true
-      for (const [, slot] of this.pending) {
-        if (!slot.received) slot.reject(err)
-      }
-      this.pending.clear()
+      this.tearDown(err)
     })
   }
 
@@ -85,28 +86,33 @@ export class GRPCBroker implements TypedServiceImplementation<GRPCBrokerServer> 
     }
 
     const existing = this.pending.get(serviceId)
-    if (existing?.received) {
+    if (existing?.kind === 'waiter') {
+      throw new Error(`dial(${serviceId}) already in progress`)
+    }
+    if (existing?.kind === 'received') {
+      clearTimeout(existing.gcTimer)
       this.pending.delete(serviceId)
-      return this.connectTo(existing.received)
+      return this.connectTo(existing.connInfo)
     }
 
     const connInfo = await new Promise<ConnInfo>((resolve, reject) => {
-      const slot: PendingStream = { resolve, reject }
-      this.pending.set(serviceId, slot)
-
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         const current = this.pending.get(serviceId)
-        if (current === slot && !current.received) {
+        if (current?.kind === 'waiter' && current.resolve === resolve) {
           this.pending.delete(serviceId)
           reject(new Error(`Dial timeout for service ${serviceId}`))
         }
-      }, 5000)
+      }, DIAL_TIMEOUT_MS)
+
+      this.pending.set(serviceId, { kind: 'waiter', resolve, reject, timer })
     })
 
     return this.connectTo(connInfo)
   }
 
   private connectTo(connInfo: ConnInfo): grpc.Client {
+    // Broker dial targets are loopback (TCP or unix socket) — insecure creds
+    // match what go-plugin uses and what the host expects.
     let dialAddress = connInfo.address
     if (connInfo.network === 'unix' && !dialAddress.startsWith('unix:')) {
       dialAddress = `unix:${dialAddress}`
@@ -128,7 +134,8 @@ export class GRPCBroker implements TypedServiceImplementation<GRPCBrokerServer> 
     // surfaces an error instead of hanging.
     if (connInfo.knock?.knock) {
       const pending = this.pending.get(connInfo.serviceId)
-      if (pending && !pending.received) {
+      if (pending?.kind === 'waiter') {
+        clearTimeout(pending.timer)
         this.pending.delete(connInfo.serviceId)
         pending.reject(
           new Error(
@@ -140,29 +147,44 @@ export class GRPCBroker implements TypedServiceImplementation<GRPCBrokerServer> 
     }
 
     const existing = this.pending.get(connInfo.serviceId)
-    if (existing && !existing.received) {
+    if (existing?.kind === 'waiter') {
+      clearTimeout(existing.timer)
       this.pending.delete(connInfo.serviceId)
       existing.resolve(connInfo)
       return
     }
 
-    // Announcement arrived before dial(). Park it so dial() can pick it up.
+    // Announcement arrived before dial(). Park it, and GC the slot after the
+    // dial-timeout window if no one ever consumes it — matches go-plugin's
+    // timeoutWait so a misbehaving host can't leak slots indefinitely.
+    if (existing?.kind === 'received') {
+      clearTimeout(existing.gcTimer)
+    }
+    const gcTimer = setTimeout(() => {
+      const current = this.pending.get(connInfo.serviceId)
+      if (current?.kind === 'received' && current.connInfo === connInfo) {
+        this.pending.delete(connInfo.serviceId)
+      }
+    }, DIAL_TIMEOUT_MS)
     this.pending.set(connInfo.serviceId, {
-      received: connInfo,
-      // Park noop resolve/reject so the slot's shape is stable.
-      resolve: () => {},
-      reject: () => {},
+      kind: 'received',
+      connInfo,
+      gcTimer,
     })
   }
 
-  /**
-   * NextId returns a unique ID to use next.
-   *
-   * It is possible for very long-running plugin hosts to wrap this value,
-   * though it would require a very large amount of calls.
-   */
-  nextServiceId(): number {
-    return ++this.nextId
+  private tearDown(reason: Error): void {
+    this.stream = null
+    this.closed = true
+    for (const [, entry] of this.pending) {
+      if (entry.kind === 'waiter') {
+        clearTimeout(entry.timer)
+        entry.reject(reason)
+      } else {
+        clearTimeout(entry.gcTimer)
+      }
+    }
+    this.pending.clear()
   }
 
   /**
@@ -172,17 +194,9 @@ export class GRPCBroker implements TypedServiceImplementation<GRPCBrokerServer> 
     if (this.closed) {
       return
     }
-
-    this.closed = true
-
     if (this.stream) {
       this.stream.end()
-      this.stream = null
     }
-
-    for (const [, slot] of this.pending) {
-      if (!slot.received) slot.reject(new Error('Broker closed'))
-    }
-    this.pending.clear()
+    this.tearDown(new Error('Broker closed'))
   }
 }
