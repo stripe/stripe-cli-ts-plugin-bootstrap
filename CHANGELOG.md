@@ -1,5 +1,11 @@
 # @stripe/stripe-cli-plugin-bootstrap
 
+## 0.5.1
+
+### Patch Changes
+
+- [#7](https://github.com/stripe/stripe-cli-ts-plugin-bootstrap/pull/7) [`837951f`](https://github.com/stripe/stripe-cli-ts-plugin-bootstrap/commit/837951f1540dcb84ed43f952c4449f9aaa621e17) Thanks [@tomelm](https://github.com/tomelm)! - Fix broker dial protocol to match go-plugin v1.7.0 non-mux mode used by the Stripe CLI host. The previous implementation sent a knock request and waited for an ack, but the host only announces services via ConnInfo (no knock). Announcements arriving before `dial()` was called were silently dropped and `dial()` would then time out after 5s, leaving `CoreCLIHelper` undefined for the plugin command. Plugins that used the keychain saw this surface as a misleading "Keychain not initialized" error.
+
 ## 0.5.0
 
 ### Minor Changes
