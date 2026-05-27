@@ -1,5 +1,11 @@
 # @stripe/stripe-cli-plugin-bootstrap
 
+## 0.5.2
+
+### Patch Changes
+
+- [#9](https://github.com/stripe/stripe-cli-ts-plugin-bootstrap/pull/9) [`7c15b54`](https://github.com/stripe/stripe-cli-ts-plugin-bootstrap/commit/7c15b5452793748e889b4574b8007e64b0025f6b) Thanks [@vcheung-stripe](https://github.com/vcheung-stripe)! - Fix install-plugin to work on Windows via Git Bash: get_platform_target now detects MINGW/MSYS/Cygwin and maps to win-x64, binary builds include the .exe suffix in build and install paths, and shasum is replaced with a Node.js crypto equivalent.
+
 ## 0.5.1
 
 ### Patch Changes
