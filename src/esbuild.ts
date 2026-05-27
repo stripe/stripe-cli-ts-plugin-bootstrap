@@ -28,9 +28,9 @@ export function getPluginEsbuildConfig(
         'import { fileURLToPath as __esm_fileURLToPath } from "node:url";',
         'import { dirname as __esm_dirname } from "node:path";',
         'import { createRequire as __esm_createRequire } from "node:module";',
-        "const __filename = __esm_fileURLToPath(import.meta.url);",
-        "const __dirname = __esm_dirname(__filename);",
-        "const require = __esm_createRequire(import.meta.url);",
+        'const __filename = __esm_fileURLToPath(import.meta.url);',
+        'const __dirname = __esm_dirname(__filename);',
+        'const require = __esm_createRequire(import.meta.url);',
       ].join('\n'),
     },
 

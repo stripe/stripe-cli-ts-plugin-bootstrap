@@ -370,6 +370,11 @@ export type RequestParamValue =
 // @public
 export function requireTTY(pluginName: string): void
 
+// Warning: (ae-internal-missing-underscore) The name "resetKeychainForTests" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal
+export function resetKeychainForTests(): void
+
 // @public
 export function runInteractiveMode(
   pluginName: string,
@@ -397,6 +402,11 @@ export function setCommandArgs(args: string[]): void
 
 // @public
 export function setDefaultUserAgent(pluginName: string, pluginVersion: string): void
+
+// Warning: (ae-internal-missing-underscore) The name "setKeychainInitFailure" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal
+export function setKeychainInitFailure(reason: Error): void
 
 // @public
 export function setLogLevel(level: string): void
