@@ -25,7 +25,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Find the bootstrap package directory (works whether run directly or via npx)
-BOOTSTRAP_DIR=$(node -e "console.log(require.resolve('@stripe/stripe-cli-plugin-bootstrap/package.json').replace('/package.json', ''))" 2>/dev/null || echo "")
+BOOTSTRAP_DIR=$(node -e "const p=require.resolve('@stripe/stripe-cli-plugin-bootstrap/package.json');console.log(require('path').dirname(p).replace(/\\\\/g,'/'))" 2>/dev/null || echo "")
 
 # Fallback: if we're in the bootstrap package itself
 if [[ -z "$BOOTSTRAP_DIR" ]]; then
@@ -48,6 +48,13 @@ require_plugin_file
 read_plugin_config
 
 INSTALL_DIR="$HOME/.config/stripe/plugins/$PLUGIN_NAME/local.build.dev"
+
+# .exe suffix needed on Windows; bundle mode uses no suffix (JS file)
+EXE_SUFFIX=""
+if [[ "$(uname -s)" =~ ^(MINGW|MSYS|CYGWIN) ]]; then
+  EXE_SUFFIX=".exe"
+fi
+
 INSTALL_PATH="$INSTALL_DIR/stripe-cli-$PLUGIN_NAME"
 
 if [ "$BUILD_MODE" = "bundle" ]; then
@@ -93,7 +100,8 @@ else
   TARGET=$(get_platform_target)
   # When building a single target, build_binaries.sh doesn't add the
   # platform/arch suffix — see scripts/build_binaries.sh.
-  BUILD_PATH="./bin/stripe-cli-$PLUGIN_NAME"
+  BUILD_PATH="./bin/stripe-cli-$PLUGIN_NAME$EXE_SUFFIX"
+  INSTALL_PATH="$INSTALL_DIR/stripe-cli-$PLUGIN_NAME$EXE_SUFFIX"
 
   # Build binary for current platform
   "$BOOTSTRAP_DIR/scripts/build_binaries.sh" "./bin" "$TARGET"
@@ -117,7 +125,7 @@ else
 fi
 
 echo "🧮 updating checksum in the local plugin manifest..."
-CHECKSUM=$(shasum -a 256 -b "$INSTALL_PATH" | awk '{print $1}')
+CHECKSUM=$(node -e "const c=require('crypto'),fs=require('fs');console.log(c.createHash('sha256').update(fs.readFileSync(process.argv[1])).digest('hex'))" "$INSTALL_PATH")
 node "$BOOTSTRAP_DIR/dist/cli-tools/updateChecksum.js" "$PLUGIN_NAME" "$CHECKSUM"
 
 echo "📝 adding plugin to installed_plugins in config.toml..."

@@ -57,6 +57,7 @@ get_platform_target() {
   case "$os" in
     darwin) os="macos" ;;
     linux) os="linux" ;;
+    mingw*|msys*|cygwin*) os="win" ;;
     *) echo "Unsupported OS: $os" >&2; exit 1 ;;
   esac
 
