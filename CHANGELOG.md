@@ -1,5 +1,11 @@
 # @stripe/stripe-cli-plugin-bootstrap
 
+## 0.5.3
+
+### Patch Changes
+
+- [#11](https://github.com/stripe/stripe-cli-ts-plugin-bootstrap/pull/11) [`c4c3380`](https://github.com/stripe/stripe-cli-ts-plugin-bootstrap/commit/c4c3380da214c54ac8c63a456fa2bb8bc2396c3a) Thanks [@vcheung-stripe](https://github.com/vcheung-stripe)! - Fix ReferenceError when using getPluginEsbuildConfig from an ESM context by replacing bare require and \_\_dirname with createRequire and fileURLToPath equivalents
+
 ## 0.5.2
 
 ### Patch Changes
