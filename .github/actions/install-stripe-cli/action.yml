@@ -23,7 +23,7 @@ runs:
       if: runner.os == 'Windows'
       shell: powershell
       run: |
-        winget install Stripe.StripeCli -e --accept-package-agreements --accept-source-agreements
+        winget install Stripe.StripeCli -e --source winget --accept-package-agreements --accept-source-agreements
         $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "User")
         $stripeDir = Split-Path (Get-Command stripe).Source
         echo $stripeDir >> $env:GITHUB_PATH
