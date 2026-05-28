@@ -13,7 +13,7 @@ function getConfigPath(): string {
   const xdgConfigHome = process.env.XDG_CONFIG_HOME
   const configDir =
     xdgConfigHome && xdgConfigHome.trim() !== ''
-      ? path.resolve(xdgConfigHome)
+      ? path.join(path.resolve(xdgConfigHome), 'stripe')
       : path.join(os.homedir(), '.config', 'stripe')
   return path.join(configDir, 'config.toml')
 }
