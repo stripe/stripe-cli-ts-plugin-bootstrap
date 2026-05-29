@@ -71,8 +71,12 @@ function main() {
     process.exit(1)
   }
 
-  const homeDir = os.homedir()
-  const configFilePath = path.join(homeDir, '.config', 'stripe', 'plugins.toml')
+  const xdgConfigHome = process.env.XDG_CONFIG_HOME
+  const stripeConfigDir =
+    xdgConfigHome && xdgConfigHome.trim() !== ''
+      ? path.join(path.resolve(xdgConfigHome), 'stripe')
+      : path.join(os.homedir(), '.config', 'stripe')
+  const configFilePath = path.join(stripeConfigDir, 'plugins.toml')
 
   let pc: PluginList = { Plugin: [] }
 

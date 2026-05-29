@@ -1,0 +1,59 @@
+name: Install dependencies
+description: Install pnpm, Node.js, Bun, and project dependencies
+
+inputs:
+  package_manager:
+    description: Package manager to use for installing dependencies (pnpm or npm)
+    required: false
+    default: pnpm
+  bun_version:
+    description: Bun version to install
+    required: false
+    default: '1.3.13'
+  node_version:
+    description: Node.js version to install (defaults to .node-version file)
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Install pnpm
+      if: inputs.package_manager == 'pnpm'
+      uses: pnpm/action-setup@v4
+
+    - name: Read Node version
+      id: nodever
+      shell: bash
+      env:
+        INPUT_NODE_VERSION: ${{ inputs.node_version }}
+      run: |
+        if [ -n "$INPUT_NODE_VERSION" ]; then
+          echo "node-version=$INPUT_NODE_VERSION" >> "$GITHUB_OUTPUT"
+        else
+          echo "node-version=$(cat .node-version)" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ steps.nodever.outputs.node-version }}
+        registry-url: 'https://npm.pkg.github.com'
+        scope: '@stripe'
+        cache: ${{ inputs.package_manager }}
+
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: ${{ inputs.bun_version }}
+
+    - name: Install dependencies
+      shell: bash
+      env:
+        INPUT_PACKAGE_MANAGER: ${{ inputs.package_manager }}
+      run: |
+        if [ "$INPUT_PACKAGE_MANAGER" = "npm" ]; then
+          npm ci
+        else
+          pnpm install --frozen-lockfile
+        fi
