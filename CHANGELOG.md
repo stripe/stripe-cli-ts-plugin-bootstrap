@@ -1,5 +1,11 @@
 # @stripe/stripe-cli-plugin-bootstrap
 
+## 0.5.4
+
+### Patch Changes
+
+- [#13](https://github.com/stripe/stripe-cli-ts-plugin-bootstrap/pull/13) [`3518704`](https://github.com/stripe/stripe-cli-ts-plugin-bootstrap/commit/3518704124a44445fb888a5739577cede026734b) Thanks [@vcheung-stripe](https://github.com/vcheung-stripe)! - Fix XDG_CONFIG_HOME handling in addPluginToConfig and addPluginToManifest to use $XDG_CONFIG_HOME/stripe/ as the config directory. Also adds composite GitHub Actions for installing dependencies and the Stripe CLI.
+
 ## 0.5.3
 
 ### Patch Changes

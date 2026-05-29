@@ -1,6 +1,6 @@
 {
   "name": "@stripe/stripe-cli-smoke-plugin",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "private": true,
   "description": "Minimal plugin fixture used by the Tier 1 smoke test. Boots a gRPC server via bootstrap's servePlugin and exits on SIGTERM. Not published.",
   "main": "dist/bundle.js",

@@ -1,5 +1,12 @@
 # @stripe/stripe-cli-smoke-plugin
 
+## 0.0.11
+
+### Patch Changes
+
+- Updated dependencies [[`3518704`](https://github.com/stripe/stripe-cli-ts-plugin-bootstrap/commit/3518704124a44445fb888a5739577cede026734b)]:
+  - @stripe/stripe-cli-plugin-bootstrap@0.5.4
+
 ## 0.0.10
 
 ### Patch Changes
