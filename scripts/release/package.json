@@ -7,7 +7,8 @@
     "get-target-manifest-file": "dist/getTargetManifestFile.js",
     "download-manifest": "dist/downloadManifest.js",
     "update-manifest": "dist/updateManifest.js",
-    "publish-plugin": "dist/publishPlugin.js"
+    "publish-plugin": "dist/publishPlugin.js",
+    "publish-plugin-with-admin-app": "dist/publishPluginWithAdminApp.js"
   },
   "scripts": {
     "build": "pnpm compile:ts",

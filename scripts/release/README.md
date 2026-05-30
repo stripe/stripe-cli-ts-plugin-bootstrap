@@ -91,7 +91,7 @@ Downloads `plugins-<plugin-name>.toml` from Artifactory to `dist/` directory.
 
 ### publishPlugin.ts
 
-Uploads plugin binaries and manifest to Artifactory.
+Uploads plugin binaries and a manifest file to Artifactory.
 
 **Usage:**
 
@@ -99,12 +99,13 @@ Uploads plugin binaries and manifest to Artifactory.
 export ARTIFACTORY_HOST="your-host"
 export ARTIFACTORY_SECRET="your-secret"
 export ARTIFACTORY_REPO="stripe-cli-plugins"
-npm run publish-plugin <version>
+npm run publish-plugin <version> <manifest-filename>
 ```
 
 **Arguments:**
 
 - `version` - Plugin version (e.g., 0.0.2 or v0.0.2)
+- `manifest-filename` - Manifest filename to upload from `dist/`
 
 **Environment Variables:**
 
@@ -121,7 +122,7 @@ npm run publish-plugin <version>
    - All binaries are uploaded with the same name (`stripe-cli-<plugin-name>`)
    - Differentiated by their path (OS/arch)
    - Each binary is self-contained (assets are embedded at build time)
-4. Uploads manifest file to `plugins-<plugin-name>.toml`
+4. Uploads the manifest file to the Artifactory root using the provided manifest filename
 
 **Example upload paths for version 0.0.2:**
 
@@ -164,11 +165,76 @@ In `.github/workflows/release.yml`:
   working-directory: ./scripts/release
 
 - name: Publish plugin
-  run: npm run publish-plugin ${{ steps.bump-version.outputs.new_version }}
+  run: npm run publish-plugin ${{ steps.bump-version.outputs.new_version }} plugins-generate.toml
   working-directory: ./scripts/release
   env:
     ARTIFACTORY_HOST: ${{ secrets.ARTIFACTORY_HOST }}
     ARTIFACTORY_SECRET: ${{ secrets.ARTIFACTORY_SECRET }}
     ARTIFACTORY_REPO: stripe-cli-plugins
+    DRYRUN_PUBLISH: ${{ vars.DRYRUN_PUBLISH }}
+```
+
+### publishPluginWithAdminApp.ts
+
+Uploads plugin binaries to Artifactory and updates Stripe CLI plugin metadata via
+the authenticated Stripe API.
+
+**Usage:**
+
+```bash
+export ARTIFACTORY_HOST="your-host"
+export ARTIFACTORY_SECRET="your-secret"
+export ARTIFACTORY_REPO="stripe-cli-plugins"
+export STRIPE_API_KEY="sk_live_..."
+npm run publish-plugin-with-admin-app <version>
+```
+
+**Arguments:**
+
+- `version` - Plugin version (e.g., 0.0.2 or v0.0.2)
+
+**Environment Variables:**
+
+- `ARTIFACTORY_HOST` - Artifactory hostname (required)
+- `ARTIFACTORY_SECRET` - Bearer token for Artifactory authentication
+- `ARTIFACTORY_REPO` - Artifactory repository name
+- `STRIPE_API_KEY` - Stripe secret key with `stripecli_plugin_write` permission
+- `PLUGIN_AVAILABILITY` - Optional override for release availability (`public` or `conditional`); defaults to `conditional` for `docs`, `generate`, `health`, and `spec`, otherwise `public`
+- `DRYRUN_PUBLISH` - Set to any value to enable dry-run mode (no actual uploads)
+
+**What it does:**
+
+1. Reads plugin name from `.plugin` file
+2. Finds all built binaries in `bin/` directory
+3. Computes SHA256 checksums for each binary
+4. Uploads binaries to `<plugin-name>/<version>/<os>/<arch>/stripe-cli-<plugin-name>`
+   - All binaries are uploaded with the same name (`stripe-cli-<plugin-name>`)
+   - Differentiated by their path (OS/arch)
+   - Each binary is self-contained (assets are embedded at build time)
+5. Calls `POST /v1/stripecli/update-plugin-metadata` for each uploaded platform
+   to register the version, OS, arch, checksum, and availability in Stripe
+
+### CI Usage
+
+In `.github/workflows/release.yml`:
+
+```yaml
+- name: Build binaries
+  run: npm run build:package
+
+- name: Install release script dependencies
+  run: npm install
+  working-directory: ./scripts/release
+
+- name: Publish plugin with Admin App
+  run: npm run publish-plugin-with-admin-app ${{ steps.bump-version.outputs.new_version }}
+  working-directory: ./scripts/release
+  env:
+    ARTIFACTORY_HOST: ${{ secrets.ARTIFACTORY_HOST }}
+    ARTIFACTORY_SECRET: ${{ secrets.ARTIFACTORY_SECRET }}
+    ARTIFACTORY_REPO: stripe-cli-plugins
+    STRIPE_API_KEY: ${{ secrets.STRIPE_API_KEY }}
+    # Optional for feature-gated plugins; omit for public releases.
+    PLUGIN_AVAILABILITY: conditional
     DRYRUN_PUBLISH: ${{ vars.DRYRUN_PUBLISH }}
 ```
