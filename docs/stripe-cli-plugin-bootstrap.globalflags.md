@@ -4,17 +4,12 @@
 
 ## GlobalFlags type
 
-Global flags available to all Stripe CLI plugin commands
+All global flags (base + config). Kept for backwards compatibility.
 
 **Signature:**
 
 ```typescript
-export type GlobalFlags = {
-  'api-key'?: string
-  color?: string
-  config?: string
-  'device-name'?: string
-  'log-level': string
-  'project-name': string
-}
+export type GlobalFlags = BaseFlags & ConfigFlags
 ```
+
+**References:** [BaseFlags](./stripe-cli-plugin-bootstrap.baseflags.md)<!-- -->, [ConfigFlags](./stripe-cli-plugin-bootstrap.configflags.md)

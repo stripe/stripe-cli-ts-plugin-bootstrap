@@ -4,7 +4,11 @@
 
 ## registerGlobalFlags() function
 
-Register global flags on a yargs instance Ported from bootstrap.go registerGlobalFlags lines 95-104
+> Warning: This API is now obsolete.
+>
+> Use [registerBaseFlags()](./stripe-cli-plugin-bootstrap.registerbaseflags.md) and optionally [registerConfigFlags()](./stripe-cli-plugin-bootstrap.registerconfigflags.md) instead.
+
+Register all global flags (base + config) on a yargs instance.
 
 **Signature:**
 

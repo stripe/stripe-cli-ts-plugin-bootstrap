@@ -30,6 +30,12 @@ export interface APIKeyAuth {
 }
 
 // @public
+export type BaseFlags = {
+  color?: string
+  'log-level': string
+}
+
+// @public
 export function buildArgsArray(
   cmd: ExtractedCommand,
   args: Record<string, unknown>,
@@ -81,6 +87,14 @@ export class Config {
   redactAllLivemodeValues(): void
   saveLivemodeValue(fieldID: string, value: string): Promise<void>
   writeConfigField(field: string, value: any): void
+}
+
+// @public
+export type ConfigFlags = {
+  'api-key'?: string
+  config?: string
+  'device-name'?: string
+  'project-name': string
 }
 
 // @public
@@ -197,20 +211,13 @@ export function getPluginEsbuildConfig(
 ): BuildOptions
 
 // @public
-export function getPluginYargs(pluginName: string): Argv<GlobalFlags>
+export function getPluginYargs(pluginName: string): Argv<BaseFlags>
 
 // @public
 export function getStripeCLIConfig(): Config
 
 // @public
-export type GlobalFlags = {
-  'api-key'?: string
-  color?: string
-  config?: string
-  'device-name'?: string
-  'log-level': string
-  'project-name': string
-}
+export type GlobalFlags = BaseFlags & ConfigFlags
 
 // @public
 export function initializeConfig(
@@ -351,6 +358,12 @@ export function redactAPIKey(apiKey: string): string
 export function redactArgs(args: string[]): string[]
 
 // @public
+export function registerBaseFlags<T>(pluginYargs: Argv<T>): Argv<T & BaseFlags>
+
+// @public
+export function registerConfigFlags<T>(pluginYargs: Argv<T>): Argv<T & ConfigFlags>
+
+// @public @deprecated
 export function registerGlobalFlags<T>(pluginYargs: Argv<T>): Argv<T & GlobalFlags>
 
 // @public

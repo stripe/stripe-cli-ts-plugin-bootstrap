@@ -67,32 +67,60 @@ export {
 } from './grpc/index.js'
 
 /**
- * Global flags available to all Stripe CLI plugin commands
+ * Base flags registered on every Stripe CLI plugin (infrastructure-level).
  * @public
  */
-export type GlobalFlags = {
-  'api-key'?: string
+export type BaseFlags = {
   color?: string
+  'log-level': string
+}
+
+/**
+ * Config-aware flags for plugins that read the Stripe CLI config or talk to the Stripe API.
+ * Plugins that need these should call {@link registerConfigFlags} after {@link getPluginYargs}.
+ * @public
+ */
+export type ConfigFlags = {
+  'api-key'?: string
   config?: string
   'device-name'?: string
-  'log-level': string
   'project-name': string
 }
 
 /**
- * Register global flags on a yargs instance
- * Ported from bootstrap.go registerGlobalFlags lines 95-104
+ * All global flags (base + config). Kept for backwards compatibility.
  * @public
  */
-export function registerGlobalFlags<T>(pluginYargs: Argv<T>): Argv<T & GlobalFlags> {
+export type GlobalFlags = BaseFlags & ConfigFlags
+
+/**
+ * Register base flags (color, log-level) on a yargs instance.
+ * These are universal to all plugins.
+ * @public
+ */
+export function registerBaseFlags<T>(pluginYargs: Argv<T>): Argv<T & BaseFlags> {
+  return pluginYargs
+    .option('color', {
+      type: 'string',
+      description: 'turn on/off color output (on, off, auto)',
+    })
+    .option('log-level', {
+      type: 'string',
+      default: 'info',
+      description: 'log level (debug, info, trace, warn, error)',
+    })
+}
+
+/**
+ * Register config-aware flags (api-key, config, device-name, project-name) on a yargs instance.
+ * Use this for plugins that read the Stripe CLI config file or call the Stripe API.
+ * @public
+ */
+export function registerConfigFlags<T>(pluginYargs: Argv<T>): Argv<T & ConfigFlags> {
   return pluginYargs
     .option('api-key', {
       type: 'string',
       description: 'Your API key to use for the command',
-    })
-    .option('color', {
-      type: 'string',
-      description: 'turn on/off color output (on, off, auto)',
     })
     .option('config', {
       type: 'string',
@@ -101,11 +129,6 @@ export function registerGlobalFlags<T>(pluginYargs: Argv<T>): Argv<T & GlobalFla
     .option('device-name', {
       type: 'string',
       description: 'device name',
-    })
-    .option('log-level', {
-      type: 'string',
-      default: 'info',
-      description: 'log level (debug, info, trace, warn, error)',
     })
     .option('project-name', {
       alias: 'p',
@@ -116,17 +139,27 @@ export function registerGlobalFlags<T>(pluginYargs: Argv<T>): Argv<T & GlobalFla
 }
 
 /**
- * Get a yargs instance configured for a Stripe CLI plugin
+ * Register all global flags (base + config) on a yargs instance.
+ * @public
+ * @deprecated Use {@link registerBaseFlags} and optionally {@link registerConfigFlags} instead.
+ */
+export function registerGlobalFlags<T>(pluginYargs: Argv<T>): Argv<T & GlobalFlags> {
+  return registerConfigFlags(registerBaseFlags(pluginYargs))
+}
+
+/**
+ * Get a yargs instance configured for a Stripe CLI plugin.
+ * Only registers base flags (color, log-level). Call {@link registerConfigFlags}
+ * on the result if your plugin needs config-aware flags.
  * @param pluginName - The name of the plugin (e.g., "apps", "generate")
- * @returns A yargs instance with global flags registered
+ * @returns A yargs instance with base flags registered
  * @public
  */
-export function getPluginYargs(pluginName: string): Argv<GlobalFlags> {
-  return registerGlobalFlags(
+export function getPluginYargs(pluginName: string): Argv<BaseFlags> {
+  return registerBaseFlags(
     yargs()
       .scriptName(`stripe ${pluginName}`)
       .exitProcess(false)
-      // Report an error for any command line argument given which is not registered above.
       .strict()
       .help()
       .demandCommand(1, 'Please specify a command.'),

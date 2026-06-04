@@ -4,12 +4,12 @@
 
 ## getPluginYargs() function
 
-Get a yargs instance configured for a Stripe CLI plugin
+Get a yargs instance configured for a Stripe CLI plugin. Only registers base flags (color, log-level). Call [registerConfigFlags()](./stripe-cli-plugin-bootstrap.registerconfigflags.md) on the result if your plugin needs config-aware flags.
 
 **Signature:**
 
 ```typescript
-export declare function getPluginYargs(pluginName: string): Argv<GlobalFlags>
+export declare function getPluginYargs(pluginName: string): Argv<BaseFlags>
 ```
 
 ## Parameters
@@ -44,6 +44,6 @@ The name of the plugin (e.g., "apps", "generate")
 
 **Returns:**
 
-Argv&lt;[GlobalFlags](./stripe-cli-plugin-bootstrap.globalflags.md)<!-- -->&gt;
+Argv&lt;[BaseFlags](./stripe-cli-plugin-bootstrap.baseflags.md)<!-- -->&gt;
 
-A yargs instance with global flags registered
+A yargs instance with base flags registered

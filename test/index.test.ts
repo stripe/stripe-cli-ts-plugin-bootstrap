@@ -2,7 +2,14 @@ import { describe, it, expect, expectTypeOf, vi } from 'vitest'
 import * as grpc from '@grpc/grpc-js'
 import {
   formatHandshake,
+  getPluginYargs,
+  registerBaseFlags,
+  registerConfigFlags,
+  registerGlobalFlags,
   servePlugin,
+  type BaseFlags,
+  type ConfigFlags,
+  type GlobalFlags,
   type NetworkType,
   type ServeOptions,
   type PluginCommand,
@@ -15,6 +22,78 @@ class MockPlugin implements PluginCommand {
     // no-op
   }
 }
+
+describe('index:getPluginYargs', () => {
+  it('only registers base flags (color, log-level)', () => {
+    const yargs = getPluginYargs('testplugin')
+    const options = yargs.getOptions()
+    const keys = [...options.string, ...options.boolean].filter((k) => k !== '$0' && k !== '_')
+    expect(keys).toContain('color')
+    expect(keys).toContain('log-level')
+    expect(keys).not.toContain('api-key')
+    expect(keys).not.toContain('config')
+    expect(keys).not.toContain('device-name')
+    expect(keys).not.toContain('project-name')
+  })
+
+  it('returns a yargs instance with strict mode and help enabled', async () => {
+    const yargs = getPluginYargs('myplugin')
+    const help = await yargs.getHelp()
+    expect(help).toContain('--color')
+    expect(help).toContain('--log-level')
+    expect(help).not.toContain('--api-key')
+    expect(help).not.toContain('--config')
+    expect(help).not.toContain('--device-name')
+    expect(help).not.toContain('--project-name')
+  })
+})
+
+describe('index:registerConfigFlags', () => {
+  it('adds config-aware flags to a yargs instance', () => {
+    const yargs = registerConfigFlags(getPluginYargs('testplugin'))
+    const options = yargs.getOptions()
+    const keys = [...options.string, ...options.boolean].filter((k) => k !== '$0' && k !== '_')
+    expect(keys).toContain('api-key')
+    expect(keys).toContain('config')
+    expect(keys).toContain('device-name')
+    expect(keys).toContain('project-name')
+    expect(keys).toContain('color')
+    expect(keys).toContain('log-level')
+  })
+})
+
+describe('index:registerGlobalFlags (deprecated)', () => {
+  it('registers all flags for backwards compatibility', () => {
+    const yargs = registerGlobalFlags(getPluginYargs('testplugin'))
+    const options = yargs.getOptions()
+    const keys = [...options.string, ...options.boolean].filter((k) => k !== '$0' && k !== '_')
+    expect(keys).toContain('api-key')
+    expect(keys).toContain('color')
+    expect(keys).toContain('config')
+    expect(keys).toContain('device-name')
+    expect(keys).toContain('log-level')
+    expect(keys).toContain('project-name')
+  })
+})
+
+describe('index:flag types', () => {
+  it('GlobalFlags is the union of BaseFlags and ConfigFlags', () => {
+    expectTypeOf<GlobalFlags>().toMatchTypeOf<BaseFlags & ConfigFlags>()
+  })
+
+  it('BaseFlags has only color and log-level', () => {
+    expectTypeOf<BaseFlags>().toEqualTypeOf<{ color?: string; 'log-level': string }>()
+  })
+
+  it('ConfigFlags has api-key, config, device-name, project-name', () => {
+    expectTypeOf<ConfigFlags>().toEqualTypeOf<{
+      'api-key'?: string
+      config?: string
+      'device-name'?: string
+      'project-name': string
+    }>()
+  })
+})
 
 describe('index:formatHandshake', () => {
   it('produces expected string and type (runtime + type)', () => {
