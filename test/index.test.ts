@@ -3,13 +3,17 @@ import * as grpc from '@grpc/grpc-js'
 import {
   formatHandshake,
   getPluginYargs,
+  registerApiKeyFlag,
   registerBaseFlags,
   registerConfigFlags,
   registerGlobalFlags,
+  registerProfileFlags,
   servePlugin,
+  type ApiKeyFlags,
   type BaseFlags,
   type ConfigFlags,
   type GlobalFlags,
+  type ProfileFlags,
   type NetworkType,
   type ServeOptions,
   type PluginCommand,
@@ -27,7 +31,9 @@ describe('index:getPluginYargs', () => {
   it('only registers base flags (color, log-level)', () => {
     const yargs = getPluginYargs('testplugin')
     const options = yargs.getOptions()
-    const keys = [...options.string, ...options.boolean].filter((k) => k !== '$0' && k !== '_')
+    const keys = [...options.string, ...options.boolean].filter(
+      k => k !== '$0' && k !== '_',
+    )
     expect(keys).toContain('color')
     expect(keys).toContain('log-level')
     expect(keys).not.toContain('api-key')
@@ -48,11 +54,41 @@ describe('index:getPluginYargs', () => {
   })
 })
 
+describe('index:registerApiKeyFlag', () => {
+  it('adds only --api-key', () => {
+    const yargs = registerApiKeyFlag(getPluginYargs('testplugin'))
+    const options = yargs.getOptions()
+    const keys = [...options.string, ...options.boolean].filter(
+      k => k !== '$0' && k !== '_',
+    )
+    expect(keys).toContain('api-key')
+    expect(keys).not.toContain('config')
+    expect(keys).not.toContain('device-name')
+    expect(keys).not.toContain('project-name')
+  })
+})
+
+describe('index:registerProfileFlags', () => {
+  it('adds --config, --device-name, --project-name', () => {
+    const yargs = registerProfileFlags(getPluginYargs('testplugin'))
+    const options = yargs.getOptions()
+    const keys = [...options.string, ...options.boolean].filter(
+      k => k !== '$0' && k !== '_',
+    )
+    expect(keys).toContain('config')
+    expect(keys).toContain('device-name')
+    expect(keys).toContain('project-name')
+    expect(keys).not.toContain('api-key')
+  })
+})
+
 describe('index:registerConfigFlags', () => {
-  it('adds config-aware flags to a yargs instance', () => {
+  it('adds all config-aware flags (api-key + profile)', () => {
     const yargs = registerConfigFlags(getPluginYargs('testplugin'))
     const options = yargs.getOptions()
-    const keys = [...options.string, ...options.boolean].filter((k) => k !== '$0' && k !== '_')
+    const keys = [...options.string, ...options.boolean].filter(
+      k => k !== '$0' && k !== '_',
+    )
     expect(keys).toContain('api-key')
     expect(keys).toContain('config')
     expect(keys).toContain('device-name')
@@ -66,7 +102,9 @@ describe('index:registerGlobalFlags (deprecated)', () => {
   it('registers all flags for backwards compatibility', () => {
     const yargs = registerGlobalFlags(getPluginYargs('testplugin'))
     const options = yargs.getOptions()
-    const keys = [...options.string, ...options.boolean].filter((k) => k !== '$0' && k !== '_')
+    const keys = [...options.string, ...options.boolean].filter(
+      k => k !== '$0' && k !== '_',
+    )
     expect(keys).toContain('api-key')
     expect(keys).toContain('color')
     expect(keys).toContain('config')
@@ -85,13 +123,20 @@ describe('index:flag types', () => {
     expectTypeOf<BaseFlags>().toEqualTypeOf<{ color?: string; 'log-level': string }>()
   })
 
-  it('ConfigFlags has api-key, config, device-name, project-name', () => {
-    expectTypeOf<ConfigFlags>().toEqualTypeOf<{
-      'api-key'?: string
+  it('ApiKeyFlags has only api-key', () => {
+    expectTypeOf<ApiKeyFlags>().toEqualTypeOf<{ 'api-key'?: string }>()
+  })
+
+  it('ProfileFlags has config, device-name, project-name', () => {
+    expectTypeOf<ProfileFlags>().toEqualTypeOf<{
       config?: string
       'device-name'?: string
       'project-name': string
     }>()
+  })
+
+  it('ConfigFlags is ApiKeyFlags & ProfileFlags', () => {
+    expectTypeOf<ConfigFlags>().toMatchTypeOf<ApiKeyFlags & ProfileFlags>()
   })
 })
 

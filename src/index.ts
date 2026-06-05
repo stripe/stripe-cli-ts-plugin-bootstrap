@@ -76,16 +76,28 @@ export type BaseFlags = {
 }
 
 /**
- * Config-aware flags for plugins that read the Stripe CLI config or talk to the Stripe API.
- * Plugins that need these should call {@link registerConfigFlags} after {@link getPluginYargs}.
+ * Flags for plugins that call the Stripe API directly.
  * @public
  */
-export type ConfigFlags = {
+export type ApiKeyFlags = {
   'api-key'?: string
+}
+
+/**
+ * Flags for plugins that resolve a CLI config profile (project-aware plugins).
+ * @public
+ */
+export type ProfileFlags = {
   config?: string
   'device-name'?: string
   'project-name': string
 }
+
+/**
+ * All config-aware flags (api-key + profile). Convenience union.
+ * @public
+ */
+export type ConfigFlags = ApiKeyFlags & ProfileFlags
 
 /**
  * All global flags (base + config). Kept for backwards compatibility.
@@ -112,16 +124,24 @@ export function registerBaseFlags<T>(pluginYargs: Argv<T>): Argv<T & BaseFlags> 
 }
 
 /**
- * Register config-aware flags (api-key, config, device-name, project-name) on a yargs instance.
- * Use this for plugins that read the Stripe CLI config file or call the Stripe API.
+ * Register the --api-key flag.
+ * Use this for plugins that call the Stripe API directly.
  * @public
  */
-export function registerConfigFlags<T>(pluginYargs: Argv<T>): Argv<T & ConfigFlags> {
+export function registerApiKeyFlag<T>(pluginYargs: Argv<T>): Argv<T & ApiKeyFlags> {
+  return pluginYargs.option('api-key', {
+    type: 'string',
+    description: 'Your API key to use for the command',
+  })
+}
+
+/**
+ * Register profile flags (--config, --device-name, --project-name).
+ * Use this for project-aware plugins that resolve a CLI config profile.
+ * @public
+ */
+export function registerProfileFlags<T>(pluginYargs: Argv<T>): Argv<T & ProfileFlags> {
   return pluginYargs
-    .option('api-key', {
-      type: 'string',
-      description: 'Your API key to use for the command',
-    })
     .option('config', {
       type: 'string',
       description: 'config file (default is $HOME/.config/stripe/config.toml)',
@@ -139,9 +159,18 @@ export function registerConfigFlags<T>(pluginYargs: Argv<T>): Argv<T & ConfigFla
 }
 
 /**
+ * Register all config-aware flags (api-key + profile) on a yargs instance.
+ * Convenience for plugins that need both API access and config profile resolution.
+ * @public
+ */
+export function registerConfigFlags<T>(pluginYargs: Argv<T>): Argv<T & ConfigFlags> {
+  return registerProfileFlags(registerApiKeyFlag(pluginYargs))
+}
+
+/**
  * Register all global flags (base + config) on a yargs instance.
  * @public
- * @deprecated Use {@link registerBaseFlags} and optionally {@link registerConfigFlags} instead.
+ * @deprecated Use {@link registerBaseFlags} and optionally {@link registerApiKeyFlag} / {@link registerProfileFlags} / {@link registerConfigFlags} instead.
  */
 export function registerGlobalFlags<T>(pluginYargs: Argv<T>): Argv<T & GlobalFlags> {
   return registerConfigFlags(registerBaseFlags(pluginYargs))

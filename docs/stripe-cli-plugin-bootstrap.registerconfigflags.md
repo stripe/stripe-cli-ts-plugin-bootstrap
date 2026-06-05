@@ -4,7 +4,7 @@
 
 ## registerConfigFlags() function
 
-Register config-aware flags (api-key, config, device-name, project-name) on a yargs instance. Use this for plugins that read the Stripe CLI config file or call the Stripe API.
+Register all config-aware flags (api-key + profile) on a yargs instance. Convenience for plugins that need both API access and config profile resolution.
 
 **Signature:**
 

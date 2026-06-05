@@ -4,15 +4,12 @@
 
 ## ConfigFlags type
 
-Config-aware flags for plugins that read the Stripe CLI config or talk to the Stripe API. Plugins that need these should call [registerConfigFlags()](./stripe-cli-plugin-bootstrap.registerconfigflags.md) after [getPluginYargs()](./stripe-cli-plugin-bootstrap.getpluginyargs.md)<!-- -->.
+All config-aware flags (api-key + profile). Convenience union.
 
 **Signature:**
 
 ```typescript
-export type ConfigFlags = {
-  'api-key'?: string
-  config?: string
-  'device-name'?: string
-  'project-name': string
-}
+export type ConfigFlags = ApiKeyFlags & ProfileFlags
 ```
+
+**References:** [ApiKeyFlags](./stripe-cli-plugin-bootstrap.apikeyflags.md)<!-- -->, [ProfileFlags](./stripe-cli-plugin-bootstrap.profileflags.md)

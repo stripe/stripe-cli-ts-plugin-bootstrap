@@ -30,6 +30,11 @@ export interface APIKeyAuth {
 }
 
 // @public
+export type ApiKeyFlags = {
+  'api-key'?: string
+}
+
+// @public
 export type BaseFlags = {
   color?: string
   'log-level': string
@@ -90,12 +95,7 @@ export class Config {
 }
 
 // @public
-export type ConfigFlags = {
-  'api-key'?: string
-  config?: string
-  'device-name'?: string
-  'project-name': string
-}
+export type ConfigFlags = ApiKeyFlags & ProfileFlags
 
 // @public
 export interface CoreCLIHelper {
@@ -349,6 +349,13 @@ export class ProfileCredentialResolver implements CredentialResolver {
 }
 
 // @public
+export type ProfileFlags = {
+  config?: string
+  'device-name'?: string
+  'project-name': string
+}
+
+// @public
 export type QueryParams = Record<string, string | number | boolean>
 
 // @public
@@ -358,6 +365,9 @@ export function redactAPIKey(apiKey: string): string
 export function redactArgs(args: string[]): string[]
 
 // @public
+export function registerApiKeyFlag<T>(pluginYargs: Argv<T>): Argv<T & ApiKeyFlags>
+
+// @public
 export function registerBaseFlags<T>(pluginYargs: Argv<T>): Argv<T & BaseFlags>
 
 // @public
@@ -365,6 +375,9 @@ export function registerConfigFlags<T>(pluginYargs: Argv<T>): Argv<T & ConfigFla
 
 // @public @deprecated
 export function registerGlobalFlags<T>(pluginYargs: Argv<T>): Argv<T & GlobalFlags>
+
+// @public
+export function registerProfileFlags<T>(pluginYargs: Argv<T>): Argv<T & ProfileFlags>
 
 // @public
 export type RequestParams = Record<string, RequestParamValue>

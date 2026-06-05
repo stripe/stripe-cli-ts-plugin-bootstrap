@@ -6,7 +6,7 @@
 
 > Warning: This API is now obsolete.
 >
-> Use [registerBaseFlags()](./stripe-cli-plugin-bootstrap.registerbaseflags.md) and optionally [registerConfigFlags()](./stripe-cli-plugin-bootstrap.registerconfigflags.md) instead.
+> Use [registerBaseFlags()](./stripe-cli-plugin-bootstrap.registerbaseflags.md) and optionally [registerApiKeyFlag()](./stripe-cli-plugin-bootstrap.registerapikeyflag.md) / [registerProfileFlags()](./stripe-cli-plugin-bootstrap.registerprofileflags.md) / [registerConfigFlags()](./stripe-cli-plugin-bootstrap.registerconfigflags.md) instead.
 
 Register all global flags (base + config) on a yargs instance.
 

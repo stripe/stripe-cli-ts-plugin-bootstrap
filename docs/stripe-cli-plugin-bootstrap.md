@@ -378,6 +378,15 @@ Redact sensitive flag values from an args array for safe logging. Handles both `
 </td></tr>
 <tr><td>
 
+[registerApiKeyFlag(pluginYargs)](./stripe-cli-plugin-bootstrap.registerapikeyflag.md)
+
+</td><td>
+
+Register the --api-key flag. Use this for plugins that call the Stripe API directly.
+
+</td></tr>
+<tr><td>
+
 [registerBaseFlags(pluginYargs)](./stripe-cli-plugin-bootstrap.registerbaseflags.md)
 
 </td><td>
@@ -391,7 +400,7 @@ Register base flags (color, log-level) on a yargs instance. These are universal 
 
 </td><td>
 
-Register config-aware flags (api-key, config, device-name, project-name) on a yargs instance. Use this for plugins that read the Stripe CLI config file or call the Stripe API.
+Register all config-aware flags (api-key + profile) on a yargs instance. Convenience for plugins that need both API access and config profile resolution.
 
 </td></tr>
 <tr><td>
@@ -401,6 +410,15 @@ Register config-aware flags (api-key, config, device-name, project-name) on a ya
 </td><td>
 
 Register all global flags (base + config) on a yargs instance.
+
+</td></tr>
+<tr><td>
+
+[registerProfileFlags(pluginYargs)](./stripe-cli-plugin-bootstrap.registerprofileflags.md)
+
+</td><td>
+
+Register profile flags (--config, --device-name, --project-name). Use this for project-aware plugins that resolve a CLI config profile.
 
 </td></tr>
 <tr><td>
@@ -815,6 +833,15 @@ Description
 </th></tr></thead>
 <tbody><tr><td>
 
+[ApiKeyFlags](./stripe-cli-plugin-bootstrap.apikeyflags.md)
+
+</td><td>
+
+Flags for plugins that call the Stripe API directly.
+
+</td></tr>
+<tr><td>
+
 [BaseFlags](./stripe-cli-plugin-bootstrap.baseflags.md)
 
 </td><td>
@@ -828,7 +855,7 @@ Base flags registered on every Stripe CLI plugin (infrastructure-level).
 
 </td><td>
 
-Config-aware flags for plugins that read the Stripe CLI config or talk to the Stripe API. Plugins that need these should call [registerConfigFlags()](./stripe-cli-plugin-bootstrap.registerconfigflags.md) after [getPluginYargs()](./stripe-cli-plugin-bootstrap.getpluginyargs.md)<!-- -->.
+All config-aware flags (api-key + profile). Convenience union.
 
 </td></tr>
 <tr><td>
@@ -849,6 +876,15 @@ All global flags (base + config). Kept for backwards compatibility.
 Union of supported network types for the gRPC server.
 
 - "tcp": bind to a host:port (e.g. `127.0.0.1:0` for an ephemeral port) - "unix": bind to a filesystem UNIX domain socket path
+
+</td></tr>
+<tr><td>
+
+[ProfileFlags](./stripe-cli-plugin-bootstrap.profileflags.md)
+
+</td><td>
+
+Flags for plugins that resolve a CLI config profile (project-aware plugins).
 
 </td></tr>
 <tr><td>
