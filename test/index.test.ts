@@ -3,7 +3,6 @@ import * as grpc from '@grpc/grpc-js'
 import {
   formatHandshake,
   getPluginYargs,
-  registerBaseFlags,
   registerConfigFlags,
   registerGlobalFlags,
   servePlugin,
