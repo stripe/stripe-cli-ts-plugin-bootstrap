@@ -244,7 +244,7 @@ Base esbuild configuration shared across all Stripe CLI plugins.
 
 </td><td>
 
-Get a yargs instance configured for a Stripe CLI plugin
+Get a yargs instance configured for a Stripe CLI plugin. Only registers base flags (color, log-level). Call [registerConfigFlags()](./stripe-cli-plugin-bootstrap.registerconfigflags.md) on the result if your plugin needs config-aware flags.
 
 </td></tr>
 <tr><td>
@@ -378,11 +378,29 @@ Redact sensitive flag values from an args array for safe logging. Handles both `
 </td></tr>
 <tr><td>
 
+[registerBaseFlags(pluginYargs)](./stripe-cli-plugin-bootstrap.registerbaseflags.md)
+
+</td><td>
+
+Register base flags (color, log-level) on a yargs instance. These are universal to all plugins.
+
+</td></tr>
+<tr><td>
+
+[registerConfigFlags(pluginYargs)](./stripe-cli-plugin-bootstrap.registerconfigflags.md)
+
+</td><td>
+
+Register config-aware flags (api-key, config, device-name, project-name) on a yargs instance. Use this for plugins that read the Stripe CLI config file or call the Stripe API.
+
+</td></tr>
+<tr><td>
+
 [registerGlobalFlags(pluginYargs)](./stripe-cli-plugin-bootstrap.registerglobalflags.md)
 
 </td><td>
 
-Register global flags on a yargs instance Ported from bootstrap.go registerGlobalFlags lines 95-104
+Register all global flags (base + config) on a yargs instance.
 
 </td></tr>
 <tr><td>
@@ -797,11 +815,29 @@ Description
 </th></tr></thead>
 <tbody><tr><td>
 
+[BaseFlags](./stripe-cli-plugin-bootstrap.baseflags.md)
+
+</td><td>
+
+Base flags registered on every Stripe CLI plugin (infrastructure-level).
+
+</td></tr>
+<tr><td>
+
+[ConfigFlags](./stripe-cli-plugin-bootstrap.configflags.md)
+
+</td><td>
+
+Config-aware flags for plugins that read the Stripe CLI config or talk to the Stripe API. Plugins that need these should call [registerConfigFlags()](./stripe-cli-plugin-bootstrap.registerconfigflags.md) after [getPluginYargs()](./stripe-cli-plugin-bootstrap.getpluginyargs.md)<!-- -->.
+
+</td></tr>
+<tr><td>
+
 [GlobalFlags](./stripe-cli-plugin-bootstrap.globalflags.md)
 
 </td><td>
 
-Global flags available to all Stripe CLI plugin commands
+All global flags (base + config). Kept for backwards compatibility.
 
 </td></tr>
 <tr><td>
