@@ -4,7 +4,7 @@
 
 ## Profile.getUAT() method
 
-GetUAT retrieves the user access token from the keychain. Returns null if no UAT is configured. Ported from: profile.go UAT field + retrieveLivemodeValue(UATName)
+GetUAT retrieves the user access token from the keychain. The UAT is stored as a top-level keychain item (not profile-prefixed). Returns null if no UAT is configured. Ported from: profile.go UATKeychainItemKey + KeyRing.Get
 
 **Signature:**
 

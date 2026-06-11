@@ -503,6 +503,15 @@ Describes a plugin subcommand for manifest metadata.
 </td></tr>
 <tr><td>
 
+[Compartment](./stripe-cli-plugin-bootstrap.compartment.md)
+
+</td><td>
+
+A Stripe compartment from the OIDC userinfo response. Ported from: profile.go Compartment struct
+
+</td></tr>
+<tr><td>
+
 [CoreCLIHelper](./stripe-cli-plugin-bootstrap.coreclihelper.md)
 
 </td><td>
@@ -646,6 +655,15 @@ For dashboard endpoints (`/ajax`<!-- -->, `/graphql`<!-- -->, `/manage`<!-- -->)
 </td></tr>
 <tr><td>
 
+[UserInfo](./stripe-cli-plugin-bootstrap.userinfo.md)
+
+</td><td>
+
+OIDC userinfo response persisted in the profile config. Ported from: profile.go UserInfo struct
+
+</td></tr>
+<tr><td>
+
 [YargsPlugin](./stripe-cli-plugin-bootstrap.yargsplugin.md)
 
 </td><td>
@@ -744,15 +762,6 @@ Config key name for terms acceptance validation
 </td></tr>
 <tr><td>
 
-[LiveContextName](./stripe-cli-plugin-bootstrap.livecontextname.md)
-
-</td><td>
-
-Config key name for live workspace context
-
-</td></tr>
-<tr><td>
-
 [LiveModeAPIKeyName](./stripe-cli-plugin-bootstrap.livemodeapikeyname.md)
 
 </td><td>
@@ -784,20 +793,11 @@ Config key name for test mode API key
 </td></tr>
 <tr><td>
 
-[TestWorkspaceIDName](./stripe-cli-plugin-bootstrap.testworkspaceidname.md)
+[UATKeychainItemKey](./stripe-cli-plugin-bootstrap.uatkeychainitemkey.md)
 
 </td><td>
 
-Config key name for test workspace ID
-
-</td></tr>
-<tr><td>
-
-[UATName](./stripe-cli-plugin-bootstrap.uatname.md)
-
-</td><td>
-
-Config key name for user access token
+Keychain item key for the user access token (top-level, not profile-prefixed). Matches Go's UATKeychainItemKey constant.
 
 </td></tr>
 </tbody></table>

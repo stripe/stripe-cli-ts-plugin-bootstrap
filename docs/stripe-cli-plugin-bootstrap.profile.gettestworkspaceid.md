@@ -4,7 +4,7 @@
 
 ## Profile.getTestWorkspaceID() method
 
-GetTestWorkspaceID returns the test workspace ID (e.g., "wksp_test_456") from the config file. Ported from: profile.go TestWorkspaceID field
+GetTestWorkspaceID returns the test workspace ID (e.g., "acct_test_789") from UserInfo.Compartments in the config file. Ported from: login/keys/configurer.go — TestWorkspaceID stored as non-livemode compartment
 
 **Signature:**
 

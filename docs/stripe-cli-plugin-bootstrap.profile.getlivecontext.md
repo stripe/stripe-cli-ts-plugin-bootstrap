@@ -4,7 +4,7 @@
 
 ## Profile.getLiveContext() method
 
-GetLiveContext returns the live workspace context (e.g., "wksp_123") from the config file. Ported from: profile.go LiveContext field
+GetLiveContext returns the live workspace context (e.g., "acct_live_456") from UserInfo.Compartments in the config file. Ported from: login/keys/configurer.go — LiveContext stored as livemode compartment
 
 **Signature:**
 
