@@ -67,22 +67,38 @@ export const TestModeAPIKeyName = 'test_mode_api_key'
 export const LiveModeAPIKeyName = 'live_mode_api_key'
 
 /**
- * Config key name for user access token
+ * Keychain item key for the user access token (top-level, not profile-prefixed).
+ * Matches Go's UATKeychainItemKey constant.
  * @public
  */
-export const UATName = 'uat'
+export const UATKeychainItemKey = 'uat'
 
 /**
- * Config key name for live workspace context
+ * A Stripe compartment from the OIDC userinfo response.
+ * Ported from: profile.go Compartment struct
  * @public
  */
-export const LiveContextName = 'live_context'
+export interface Compartment {
+  compartment_id: string
+  compartment_type: string
+  livemode: boolean
+  permissions?: string[]
+}
 
 /**
- * Config key name for test workspace ID
+ * OIDC userinfo response persisted in the profile config.
+ * Ported from: profile.go UserInfo struct
  * @public
  */
-export const TestWorkspaceIDName = 'test_workspace_id'
+export interface UserInfo {
+  sub?: string
+  email?: string
+  email_verified?: boolean
+  name?: string
+  compartments?: Compartment[]
+  inherit_user_permissions?: boolean
+  permissions_updated_at?: string
+}
 
 /**
  * Color setting: on
@@ -255,49 +271,46 @@ export class Profile {
 
   /**
    * GetUAT retrieves the user access token from the keychain.
+   * The UAT is stored as a top-level keychain item (not profile-prefixed).
    * Returns null if no UAT is configured.
-   * Ported from: profile.go UAT field + retrieveLivemodeValue(UATName)
+   * Ported from: profile.go UATKeychainItemKey + KeyRing.Get
    */
   async getUAT(): Promise<string | null> {
     try {
-      return await this.retrieveLivemodeValue(UATName)
+      const keychain = getKeychain()
+      return await keychain.get(UATKeychainItemKey)
     } catch {
       return null
     }
   }
 
   /**
-   * GetLiveContext returns the live workspace context (e.g., "wksp_123")
-   * from the config file.
-   * Ported from: profile.go LiveContext field
+   * GetLiveContext returns the live workspace context (e.g., "acct_live_456")
+   * from UserInfo.Compartments in the config file.
+   * Ported from: login/keys/configurer.go — LiveContext stored as livemode compartment
    */
   getLiveContext(): string | null {
-    const configData = this.config.readConfigFile()
-    if (configData && configData[this.profileName]) {
-      const profileData = configData[this.profileName] as Record<string, any>
-      const value = profileData[LiveContextName]
-      if (value) {
-        return value as string
-      }
-    }
-    return null
+    const compartments = this.getCompartments()
+    return compartments.find(c => c.livemode)?.compartment_id ?? null
   }
 
   /**
-   * GetTestWorkspaceID returns the test workspace ID (e.g., "wksp_test_456")
-   * from the config file.
-   * Ported from: profile.go TestWorkspaceID field
+   * GetTestWorkspaceID returns the test workspace ID (e.g., "acct_test_789")
+   * from UserInfo.Compartments in the config file.
+   * Ported from: login/keys/configurer.go — TestWorkspaceID stored as non-livemode compartment
    */
   getTestWorkspaceID(): string | null {
+    const compartments = this.getCompartments()
+    return compartments.find(c => !c.livemode)?.compartment_id ?? null
+  }
+
+  private getCompartments(): Compartment[] {
     const configData = this.config.readConfigFile()
-    if (configData && configData[this.profileName]) {
-      const profileData = configData[this.profileName] as Record<string, any>
-      const value = profileData[TestWorkspaceIDName]
-      if (value) {
-        return value as string
-      }
+    if (configData) {
+      const userInfo = configData['user_info'] as UserInfo | undefined
+      return userInfo?.compartments ?? []
     }
-    return null
+    return []
   }
 
   /**

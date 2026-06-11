@@ -26,7 +26,9 @@ describe('index:getPluginYargs', () => {
   it('only registers base flags (color, log-level)', () => {
     const yargs = getPluginYargs('testplugin')
     const options = yargs.getOptions()
-    const keys = [...options.string, ...options.boolean].filter((k) => k !== '$0' && k !== '_')
+    const keys = [...options.string, ...options.boolean].filter(
+      k => k !== '$0' && k !== '_',
+    )
     expect(keys).toContain('color')
     expect(keys).toContain('log-level')
     expect(keys).not.toContain('api-key')
@@ -51,7 +53,9 @@ describe('index:registerConfigFlags', () => {
   it('adds config-aware flags to a yargs instance', () => {
     const yargs = registerConfigFlags(getPluginYargs('testplugin'))
     const options = yargs.getOptions()
-    const keys = [...options.string, ...options.boolean].filter((k) => k !== '$0' && k !== '_')
+    const keys = [...options.string, ...options.boolean].filter(
+      k => k !== '$0' && k !== '_',
+    )
     expect(keys).toContain('api-key')
     expect(keys).toContain('config')
     expect(keys).toContain('device-name')
@@ -65,7 +69,9 @@ describe('index:registerGlobalFlags (deprecated)', () => {
   it('registers all flags for backwards compatibility', () => {
     const yargs = registerGlobalFlags(getPluginYargs('testplugin'))
     const options = yargs.getOptions()
-    const keys = [...options.string, ...options.boolean].filter((k) => k !== '$0' && k !== '_')
+    const keys = [...options.string, ...options.boolean].filter(
+      k => k !== '$0' && k !== '_',
+    )
     expect(keys).toContain('api-key')
     expect(keys).toContain('color')
     expect(keys).toContain('config')

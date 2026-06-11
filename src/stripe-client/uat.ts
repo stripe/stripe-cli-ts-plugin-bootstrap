@@ -123,10 +123,6 @@ function buildAPIHeaders(
     headers['Stripe-Context'] = stripeContext
   }
 
-  if (options?.stripeAccount) {
-    headers['Stripe-Account'] = options.stripeAccount
-  }
-
   return headers
 }
 

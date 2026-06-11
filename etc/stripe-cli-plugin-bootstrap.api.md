@@ -66,6 +66,18 @@ export interface CommandInfo {
 }
 
 // @public
+export interface Compartment {
+  // (undocumented)
+  compartment_id: string
+  // (undocumented)
+  compartment_type: string
+  // (undocumented)
+  livemode: boolean
+  // (undocumented)
+  permissions?: string[]
+}
+
+// @public
 export class Config {
   constructor()
   // (undocumented)
@@ -278,9 +290,6 @@ export interface KeychainItem {
   key: string
   value: string
 }
-
-// @public
-export const LiveContextName = 'live_context'
 
 // @public
 export const LiveModeAPIKeyName = 'live_mode_api_key'
@@ -539,9 +548,6 @@ export const TerminalInfo: {
 // @public
 export const TestModeAPIKeyName = 'test_mode_api_key'
 
-// @public
-export const TestWorkspaceIDName = 'test_workspace_id'
-
 // Warning: (ae-forgotten-export) The symbol "WithoutIndexSignature" needs to be exported by the entry point index.d.ts
 //
 // @public
@@ -563,7 +569,25 @@ export interface UATAuth {
 }
 
 // @public
-export const UATName = 'uat'
+export const UATKeychainItemKey = 'uat'
+
+// @public
+export interface UserInfo {
+  // (undocumented)
+  compartments?: Compartment[]
+  // (undocumented)
+  email?: string
+  // (undocumented)
+  email_verified?: boolean
+  // (undocumented)
+  inherit_user_permissions?: boolean
+  // (undocumented)
+  name?: string
+  // (undocumented)
+  permissions_updated_at?: string
+  // (undocumented)
+  sub?: string
+}
 
 // @public
 export type VersionedPlugins = Record<number, PluginCommand>

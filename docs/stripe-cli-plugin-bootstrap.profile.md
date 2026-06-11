@@ -215,7 +215,7 @@ GetDisplayName returns the account display name Ported from: profile.go lines 24
 
 </td><td>
 
-GetLiveContext returns the live workspace context (e.g., "wksp_123") from the config file. Ported from: profile.go LiveContext field
+GetLiveContext returns the live workspace context (e.g., "acct_live_456") from UserInfo.Compartments in the config file. Ported from: login/keys/configurer.go — LiveContext stored as livemode compartment
 
 </td></tr>
 <tr><td>
@@ -226,7 +226,7 @@ GetLiveContext returns the live workspace context (e.g., "wksp_123") from the co
 
 </td><td>
 
-GetTestWorkspaceID returns the test workspace ID (e.g., "wksp_test_456") from the config file. Ported from: profile.go TestWorkspaceID field
+GetTestWorkspaceID returns the test workspace ID (e.g., "acct_test_789") from UserInfo.Compartments in the config file. Ported from: login/keys/configurer.go — TestWorkspaceID stored as non-livemode compartment
 
 </td></tr>
 <tr><td>
@@ -237,7 +237,7 @@ GetTestWorkspaceID returns the test workspace ID (e.g., "wksp_test_456") from th
 
 </td><td>
 
-GetUAT retrieves the user access token from the keychain. Returns null if no UAT is configured. Ported from: profile.go UAT field + retrieveLivemodeValue(UATName)
+GetUAT retrieves the user access token from the keychain. The UAT is stored as a top-level keychain item (not profile-prefixed). Returns null if no UAT is configured. Ported from: profile.go UATKeychainItemKey + KeyRing.Get
 
 </td></tr>
 <tr><td>
