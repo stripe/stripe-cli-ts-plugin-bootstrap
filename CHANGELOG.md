@@ -1,5 +1,13 @@
 # @stripe/stripe-cli-plugin-bootstrap
 
+## 0.6.0
+
+### Minor Changes
+
+- [#16](https://github.com/stripe/stripe-cli-ts-plugin-bootstrap/pull/16) [`5ef428e`](https://github.com/stripe/stripe-cli-ts-plugin-bootstrap/commit/5ef428e12bb01db55f41853023a43ab981e02fd2) Thanks [@yahanxing-stripe](https://github.com/yahanxing-stripe)! - Remove non-universal flags from getPluginYargs default registration. Plugins now opt in to config-aware flags (--api-key, --config, --device-name, --project-name) via registerConfigFlags instead of getting them all by default.
+
+- [#20](https://github.com/stripe/stripe-cli-ts-plugin-bootstrap/pull/20) [`4e38bba`](https://github.com/stripe/stripe-cli-ts-plugin-bootstrap/commit/4e38bba3ef232108a4b9c44ef47559606a433415) Thanks [@vcheung-stripe](https://github.com/vcheung-stripe)! - Refactor UAT and compartment config to match the Go CLI storage model. Rename `UATName` to `UATKeychainItemKey` and remove `LiveContextName` and `TestWorkspaceIDName`. Add `Compartment` and `UserInfo` interfaces. `getLiveContext` and `getTestWorkspaceID` now read from `UserInfo.compartments` instead of direct config keys; `getUAT` uses a top-level keychain key instead of a profile-prefixed value.
+
 ## 0.5.4
 
 ### Patch Changes
